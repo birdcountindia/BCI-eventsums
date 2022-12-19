@@ -36,17 +36,6 @@ shinyUI <- fluidPage(
   mainPanel(
     tabsetPanel(
       tabPanel("Summary", tableOutput('summary')),
-      tabPanel("Checklist", dataTableOutput('checklist')),
-      tabPanel("Density", dataTableOutput('density')),
-      tabPanel("Common Species",
-               uiOutput("tables_common_species") ),      
-      tabPanel("Threatened Species", tableOutput('iucnspecies')),
-      tabPanel("Endemic Species", tableOutput('endemicspecies')),
-      tabPanel("Diversity Analysis", plotOutput('shannon')),
-      tabPanel("Cluster Analysis", plotOutput('braycrutis')),
-      tabPanel("Guild Analysis", plotOutput('guildAnalysis')),
-      tabPanel("Indicator Species Species",
-               uiOutput("tables_indicator_species") ),      
       tabPanel("Maps",
                fluidRow( 
                  column( 4,
