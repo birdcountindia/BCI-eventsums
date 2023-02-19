@@ -21,6 +21,7 @@ sched <- read_sheet("https://docs.google.com/spreadsheets/d/1Yf_STtmbtPZHybwT544
   mutate(across(contains(".DATE"), ~ as.Date(.)),
          START.MONTH = month(START.DATE),
          END.MONTH = month(END.DATE)) %>% 
+  # filtering for current month of interest
   filter(EDITION == rel_year,
          START.MONTH %in% rel_month_num | END.MONTH %in% rel_month_num)
 

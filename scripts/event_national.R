@@ -12,24 +12,36 @@ require(mapview)
 require(leaflet)
 require(rmapshaper)
 
-# for each event
-cur_event <- list_national 
 
-# filtering for event dates
+
+# paths
+cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/")
+
+
+
+
+
+# filtering for event dates (no location since this is nationwide)
 data0 <- data %>% filter(OBSERVATION.DATE %in% 
                            seq(cur_event$START.DATE, cur_event$END.DATE, by = "days"))
 
 
 
-
 # create and write a file with common names and scientific names of all species
 # useful for mapping
-temp = data %>%
+temp <- data0 %>%
   filter(CATEGORY == "species" | CATEGORY == "issf") %>%
   filter(!EXOTIC.CODE %in% c("X")) %>%
-  distinct(COMMON.NAME,SCIENTIFIC.NAME)
+  distinct(COMMON.NAME, SCIENTIFIC.NAME)
 
-write.csv(temp,"GBBCspecieslist2022.csv", row.names=FALSE)
+write_csv(temp, file = glue("{cur_outpath}{cur_event$FULL.CODE}_specieslist.csv"))
+rm(temp)
+
+
+
+
+# adding map vars to data -------------------------------------------------
+
 
 
 load("maps.RData")
@@ -134,24 +146,9 @@ data = left_join(temp,data)
 names(data)[1] = "g3clip"
 
 
-############ Add first and last name
 
-data$obs.id.num <- gsub("[[:alpha:]]", "", data$OBSERVER.ID)
+# analyses ----------------------------------------------------------------
 
-eBird.users = read.delim("ebd_users_relDec-2021.txt", sep = "\t", header = T, quote = "", stringsAsFactors = F, 
-                         na.strings = c(""," ",NA))
-names(eBird.users) = c("USER_ID","FIRST.NAME","LAST.NAME")
-eBird.users$obs.id.num = gsub("[[:alpha:]]", "", eBird.users$USER_ID)
-
-data = left_join(data, eBird.users)
-data$FIRST.NAME[data$obs.id.num == "1034924"] = "Monal"
-data$LAST.NAME[data$obs.id.num == "1034924"] = "Trivedi"
-data$FIRST.NAME[data$obs.id.num == "2874499"] = "Chayan"
-data$LAST.NAME[data$obs.id.num == "2874499"] = "Debnath"
-
-
-
-#rem = unique(data[is.na(data$FIRST.NAME),]$obs.id.num)
 
 
 ############ Top 10 checklist uploaders
@@ -224,6 +221,11 @@ datax = data %>%
   group_by(COMMON.NAME) %>% summarize(freq = n()/max(lists)) %>%
   arrange(desc(freq))
 write.csv(datax,"GBBCcommonspecies2022.csv", row.names=FALSE)
+
+
+
+
+# plots -------------------------------------------------------------------
 
 
 ######################################### Plot district map with info
@@ -330,6 +332,9 @@ mapshot(c, "GBBC_states_districts_2022.html")
 
 
 
+# region-wise common species ----------------------------------------------
+
+
 ############################ Common species
 
 north = c("PUNJAB","HARYANA","UTTAR PRADESH","DELHI","BIHAR","CHANDIGARH")
@@ -383,7 +388,8 @@ cosp = data2 %>%
 write.csv(cosp,"GBBC_CommonSpeciesbyRegion_2022.csv",row.names = F)
 
 
-################################### plot points on map
+# point map ---------------------------------------------------------------
+
 
 
 data4 = data %>% distinct(LOCALITY.ID,LATITUDE,LONGITUDE)
@@ -418,8 +424,8 @@ ggsave(file=n1, units="in", width=8, height=11)
 
 
 
+# regions map -------------------------------------------------------------
 
-################################################## plot region map
 
 require(ggthemes)
 theme_set(theme_tufte())
@@ -471,7 +477,9 @@ print(ggp)
 ggsave(file=n1, units="in", width=10, height=7)
 
 
-########### overall stats
+
+# overall stats -----------------------------------------------------------
+
 
 participants = length(unique(data$OBSERVER.ID))
 checklists = length(unique(data$SAMPLING.EVENT.IDENTIFIER))
@@ -484,7 +492,9 @@ species = length(unique(temp$COMMON.NAME))
 
 
 
-################################ year summaries
+
+# year summaries ----------------------------------------------------------
+
 
 load("pastGBBCdata1.RData")
 #pastdata = add_column(pastdata, EXOTIC.CODE = NA, .before = 16)
@@ -703,7 +713,9 @@ ggsave(file="spread2022.jpg", units="in", width=10, height=7)
 
 
 
-####### Campus bird count
+
+# Campus Bird Count -------------------------------------------------------
+
 
 
 campus = read.csv("2022campushotspots.csv")
