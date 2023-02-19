@@ -1,12 +1,10 @@
-
-
-
+## getting automated parameters
 source("scripts/01_param.R")
 
+
+## checking for events in month of interest
 source("scripts/02_anyevent.R")
 
-
-## check
 if (anyevent == FALSE) {
   
   print("There are no events that need summaries this month. Quitting from script.")
@@ -23,7 +21,7 @@ if (anyevent == FALSE) {
   
   
   
-  ## running corresponding analyses depending on which events present in this month
+## running corresponding analyses depending on which events present in this month
   
   if (rlang::is_empty(list_national$FULL.NAME)) {
     
