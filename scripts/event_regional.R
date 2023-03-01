@@ -70,7 +70,9 @@ if (cur_event$SHORT.CODE == "BiBC"){
                                                     "Charaideo","Tinsukia")
                                ~ "East")) %>% 
     mutate(REGION1 = factor(REGION1, 
-                            levels = c()))
+                            levels = c("North Assam Division", "Lower Assam Division",
+                                       "Central Assam Division", "Upper Assam Division",
+                                       "Barak Valley Division")))
   
   no_regions <- n_distinct(regions$REGION1)
   
@@ -109,7 +111,8 @@ if (cur_event$SHORT.CODE == "BiBC"){
                                                     "Kallakurichi","Ariyalur","Thanjavur",
                                                     "Chengalpattu","Ranipet","Thiruvarur",
                                                     "Puducherry","Karaikal")
-                               ~ "East"))
+                               ~ "East")) %>% 
+    mutate(REGION1 = factor(REGION1, levels = c("West", "Central", "South", "East")))
   
   no_regions <- n_distinct(regions$REGION1)
   

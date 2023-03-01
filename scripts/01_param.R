@@ -25,12 +25,16 @@ rel_date <- if (today() %>% day() == 31) {
 }
 
 cur_year <- cur_date %>% year()
-cur_month_num <- cur_date %>% month()
-cur_month_lab <- cur_date %>% month(label = T, abbr = T)
+# cur_month_num <- cur_date %>% month()
+# cur_month_lab <- cur_date %>% month(label = T, abbr = T)
+cur_month_num <- (cur_date - months(1)) %>% month()
+cur_month_lab <- (cur_date - months(1)) %>% month(label = T, abbr = T)
 
 rel_year <- rel_date %>% year()
-rel_month_num <- rel_date %>% month()
-rel_month_lab <- rel_date %>% month(label = T, abbr = T) 
+# rel_month_num <- rel_date %>% month()
+# rel_month_lab <- rel_date %>% month(label = T, abbr = T) 
+rel_month_num <- (rel_date - months(1)) %>% month()
+rel_month_lab <- (rel_date - months(1)) %>% month(label = T, abbr = T) 
 
 latestusersrel <- str_extract(userspath, "(?<=rel)[^.]*(?=.|$)")
 groupaccspath <- glue("../ebird-datasets/group-accounts/ebd_users_GA_rel{latestusersrel}.csv")

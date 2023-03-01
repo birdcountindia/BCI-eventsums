@@ -21,6 +21,7 @@ temp <- data %>%
   ungroup() %>% 
   # joining map vars to EBD
   st_as_sf(coords = c("LONGITUDE", "LATITUDE"), remove = F) %>% 
+  st_set_crs(st_crs(dists_sf)) %>% 
   st_join(dists_sf) %>% 
   st_join(states_sf) %>% 
   # PAs

@@ -15,7 +15,7 @@ if (anyevent == FALSE) {
   
   list_regional <- sched %>% filter(CATEGORY == "Regional")
   
-  list_multiregion <- sched %>% filter(CATEGORY == "Multi-region")
+  list_multiregional <- sched %>% filter(CATEGORY == "Multi-regional")
   
   source("scripts/03_data-import.R")
   
@@ -57,17 +57,17 @@ if (anyevent == FALSE) {
   }
   
   
-  if (rlang::is_empty(list_multiregion$FULL.NAME)) {
+  if (rlang::is_empty(list_multiregional$FULL.NAME)) {
     
-    print("No multi-region events.")
+    print("No multi-regional events.")
     
   } else {
     
     # for each event
-    for (i in length(list_multiregion$FULL.NAME)) {
+    for (i in length(list_multiregional$FULL.NAME)) {
       
-      cur_event <- list_multiregion[i,] 
-      source("scripts/event_multiregion.R")
+      cur_event <- list_multiregional[i,] 
+      source("scripts/event_multiregional.R")
       
     }
     
