@@ -140,9 +140,6 @@ overall_stats <- basic_stats(data0)
 # top 10 checklist uploaders (eligible list filter)
 top10 <- data0 %>% 
   filter(ALL.SPECIES.REPORTED == 1, DURATION.MINUTES >= 14) %>% 
-  group_by(SAMPLING.EVENT.IDENTIFIER) %>% 
-  filter(!any(OBSERVATION.COUNT == "X")) %>% 
-  ungroup() %>% 
   group_by(OBSERVER.ID, FULL.NAME) %>% 
   summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER)) %>% 
   ungroup() %>%
