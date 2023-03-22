@@ -30,10 +30,12 @@ if (anyevent == FALSE) {
   } else {
     
     # for each event
-    for (i in length(list_national$FULL.NAME)) {
+    for (i in 1:length(list_national$FULL.NAME)) {
       
       cur_event <- list_national[i,] 
+      tictoc::tic(glue("Completed analysis {i}/{length(list_national$FULL.NAME)}: {cur_event$FULL.CODE}"))
       source("scripts/event_national.R")
+      tictoc::toc()
       
     }
     
@@ -47,10 +49,12 @@ if (anyevent == FALSE) {
   } else {
     
     # for each event
-    for (i in length(list_regional$FULL.NAME)) {
+    for (i in 1:length(list_regional$FULL.NAME)) {
       
       cur_event <- list_regional[i,] 
+      tictoc::tic(glue("Completed analysis {i}/{length(list_regional$FULL.NAME)}: {cur_event$FULL.CODE}"))
       source("scripts/event_regional.R")
+      tictoc::toc()
       
     }
     
@@ -64,10 +68,12 @@ if (anyevent == FALSE) {
   } else {
     
     # for each event
-    for (i in length(list_multiregional$FULL.NAME)) {
+    for (i in 1:length(list_multiregional$FULL.NAME)) {
       
       cur_event <- list_multiregional[i,] 
+      tictoc::tic(glue("Completed analysis {i}/{length(list_multiregional$FULL.NAME)}: {cur_event$FULL.CODE}"))
       source("scripts/event_multiregional.R")
+      tictoc::toc()
       
     }
     
@@ -75,7 +81,6 @@ if (anyevent == FALSE) {
   
   
 }
-
 
 
 

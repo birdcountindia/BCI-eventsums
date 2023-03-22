@@ -14,15 +14,6 @@ load("data/maps_sf.RData")
 load(maindatapath)
 
 
-tictoc::tic("Joining mapvars to full data")
-
-sf_use_s2(FALSE)
-
-data <- join_map_sf(data)
-
-tictoc::toc()
-
-
 # user info
 eBird_users <- read.delim(userspath, sep = "\t", header = T, quote = "", 
                           stringsAsFactors = F, na.strings = c(""," ",NA)) %>% 

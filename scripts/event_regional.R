@@ -27,7 +27,12 @@ if (cur_event$SHORT.CODE == "BiBC"){
     filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE, 
                                      by = "days")) %>% 
     filter(STATE.CODE == "IN-AS")
+
+  # Joining mapvars to data
+  sf_use_s2(FALSE)
+  data0 <- join_map_sf(data0)
   
+
   cur_dists_sf <- dists_sf %>% filter(STATE.NAME == "Assam")
   cur_states_sf <- states_sf %>% filter(STATE.NAME == "Assam")
   
@@ -85,6 +90,11 @@ if (cur_event$SHORT.CODE == "BiBC"){
     filter(STATE.CODE %in% c("IN-TN","IN-PY")) %>% 
     filter(!is.na(COUNTY.CODE) & !(COUNTY.CODE %in% c("IN-PY-YA","IN-PY-MA")))
   
+  # Joining mapvars to data
+  sf_use_s2(FALSE)
+  data0 <- join_map_sf(data0)
+
+    
   cur_dists_sf <- dists_sf %>% 
     filter(STATE.NAME %in% c("Tamil Nadu", "Puducherry"),
            !(DISTRICT.NAME %in% c("Mahe","Yanam")))
@@ -275,12 +285,25 @@ if (cur_event$SHORT.CODE == "BiBC"){
   
 }
 
+max_lists <- max(na.omit(dist_stats$LISTS.ALL))
+break_at <- if (max_lists %in% 50:100) {
+  rev(c(0, 5, 10, 20, 30, max_lists))
+} else if (max_lists %in% 100:200) {
+  rev(c(0, 10, 25, 50, 90, max_lists))
+} else if (max_lists %in% 200:300) {
+  rev(c(0, 20, 50, 90, 150, max_lists))
+} else if (max_lists %in% 300:500) {
+  rev(c(0, 30, 80, 150, 250, max_lists))
+} else if (max_lists > 500) {
+  rev(c(0, 30, 100, 200, 400, max_lists))
+} 
+
 
 mapviewOptions(fgb = FALSE)
 map_effort <- mapView(dist_stats, 
                       zcol = c("LISTS.ALL"), 
                       map.types = c("Esri.WorldImagery"),
-                      layer.name = c("Checklists - Districts"), 
+                      layer.name = c("Checklists per district"), 
                       popup = leafpop::popupTable(dist_stats,
                                                   zcol = c("DISTRICT.NAME", "LISTS.ALL",
                                                            "PARTICIPANTS", "LOCATIONS", "SPECIES"), 
