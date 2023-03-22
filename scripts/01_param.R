@@ -4,7 +4,7 @@ require(glue)
 
 
 
-userspath <- "../ebird-datasets/EBD/ebd_users_relMay-2022.txt" # update when latest available
+userspath <- "../ebird-datasets/EBD/ebd_users_relFeb-2023.txt" # update when latest available
 
 
 # automated parameters ----------------------------------------------------

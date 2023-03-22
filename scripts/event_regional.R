@@ -12,7 +12,8 @@ require(ggthemes)
 
 
 # paths
-cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION)}/")
+cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION}/")
+if (!dir.exists(cur_outpath)) (dir.create(cur_outpath, recursive = T))
 
 source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/summaries.R")
 source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/mapping.R")
@@ -31,7 +32,7 @@ if (cur_event$SHORT.CODE == "BiBC"){
   cur_states_sf <- states_sf %>% filter(STATE.NAME == "Assam")
   
   
-  regions <- dists_sf %>% 
+  regions <- cur_dists_sf %>% 
     st_drop_geometry() %>% 
     dplyr::select(DISTRICT.NAME) %>% 
     mutate(REGION1 = case_when(DISTRICT.NAME %in% c("Udalguri", "Darrang", "Sonitpur", 
@@ -40,7 +41,7 @@ if (cur_event$SHORT.CODE == "BiBC"){
                                DISTRICT.NAME %in% c("Dhubri", "Kokrajhar", "Bongaigaon", 
                                                     "Goalpara", "Baksa", "Chirang", "Barpeta", 
                                                     "Nalbari", "Kamrup", "Kamrup Metropolitan", 
-                                                    "South Salmara Mankachar")
+                                                    "South Salmara Mancachar")
                                ~ "Lower Assam Division",
                                DISTRICT.NAME %in% c("Dima Hasao", "Karbi Anglong", 
                                                     "West Karbi Anglong", "Nagaon", 
@@ -75,8 +76,7 @@ if (cur_event$SHORT.CODE == "BiBC"){
                                        "Barak Valley Division")))
   
   no_regions <- n_distinct(regions$REGION1)
-  
-  
+
 } else if (cur_event$SHORT.CODE == "PBC"){
   
   data0 <- data %>% 
@@ -91,7 +91,7 @@ if (cur_event$SHORT.CODE == "BiBC"){
   cur_states_sf <- states_sf %>% filter(STATE.NAME == "Tamil Nadu")
   
   
-  regions <- dists_sf %>% 
+  regions <- cur_dists_sf %>% 
     st_drop_geometry() %>% 
     dplyr::select(DISTRICT.NAME) %>% 
     mutate(REGION1 = case_when(DISTRICT.NAME %in% c("Vellore","Tiruvannamalai","Krishnagiri",
@@ -99,17 +99,18 @@ if (cur_event$SHORT.CODE == "BiBC"){
                                                     "The Nilgiris","Tirupathur")
                                ~ "West",
                                DISTRICT.NAME %in% c("Perambalur","Karur","Dindigul",
-                                                    "Thiruvarur","Coimbatore","Tiruppur",
+                                                    "Coimbatore","Tiruppur",
                                                     "Tiruchirappalli")
                                ~ "Central",
-                               DISTRICT.NAME %in% c("Theni","Madurai","Sivaganga","Pudukkottai",
-                                                    "Ramanathapuram","Virudhunagar","Thoothukkudi",
+                               DISTRICT.NAME %in% c("Theni","Madurai","Sivagangai","Pudukkottai",
+                                                    "Ramanathapuram","Virudhunagar","Thoothukudi",
                                                     "Tirunelveli","Kanniyakumari","Tenkasi")
                                ~ "South",
-                               DISTRICT.NAME %in% c("Tiruvallur","Chennai","Kancheepuram",
+                               DISTRICT.NAME %in% c("Thiruvallur","Chennai","Kancheepuram",
                                                     "Viluppuram","Cuddalore","Nagapattinam",
                                                     "Kallakurichi","Ariyalur","Thanjavur",
                                                     "Chengalpattu","Ranipet","Thiruvarur",
+                                                    # Pondicherry
                                                     "Puducherry","Karaikal")
                                ~ "East")) %>% 
     mutate(REGION1 = factor(REGION1, levels = c("West", "Central", "South", "East")))
@@ -118,13 +119,24 @@ if (cur_event$SHORT.CODE == "BiBC"){
   
 }
 
+# sf for regions
+regions_sf <- regions %>% 
+  left_join(cur_dists_sf) %>% 
+  st_as_sf() %>% 
+  # joins multiple polygons into one for each region
+  group_by(REGION1) %>% 
+  dplyr::summarise()
+
+# adding regions to data
+data0 <- data0 %>% 
+  left_join(regions)
 
 
 # create and write a file with common and scientific names of all species
 # useful for mapping
 temp <- data0 %>%
   filter(CATEGORY == "species" | CATEGORY == "issf") %>%
-  distinct(COMMON.NAME, SCIENTIFIC.NAME)
+  distinct(COMMON.NAME)
 
 write.csv(temp, row.names = FALSE, 
           file = glue("{cur_outpath}{cur_event$FULL.CODE}_speclist.csv"))
@@ -148,6 +160,8 @@ top10 <- data0 %>%
 
 # list of birders per district
 birder_dist <- data0 %>%
+  # some districts in eBird data have no name
+  filter(!is.na(COUNTY)) %>% 
   distinct(DISTRICT.NAME, OBSERVER.ID) %>%
   # joining names
   left_join(eBird_users) %>% 
@@ -158,6 +172,9 @@ dist_sum <- data0 %>%
   group_by(DISTRICT.NAME) %>% 
   summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
             NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
+  complete(DISTRICT.NAME = cur_dists_sf$DISTRICT.NAME, 
+           fill = list(NO.LISTS = 0,
+                       NO.BIRDERS = 0)) %>% 
   arrange(desc(NO.LISTS))
 
 # day-wise summary
@@ -172,6 +189,11 @@ dist_day_sum <- data0 %>%
   group_by(DISTRICT.NAME, DAY.M) %>% 
   summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
             NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
+  ungroup() %>% 
+  complete(DISTRICT.NAME = cur_dists_sf$DISTRICT.NAME, 
+           DAY.M = seq(cur_event$START.DATE, cur_event$END.DATE, by = "days") %>% mday(),
+           fill = list(NO.LISTS = 0,
+                       NO.BIRDERS = 0)) %>% 
   arrange(DISTRICT.NAME, DAY.M)
 
 
@@ -226,39 +248,50 @@ write_xlsx(x = list("Stats" = reg_stats,
 
 # plot districtwise stats on map ----------------------------------------------------
 
-dist_stats <- data0 %>% group_by(DISTRICT.NAME) %>% basic_stats(prettify = F) %>% 
-  # keeping only necessary
-  dplyr::select(SPECIES, LISTS.ALL, PARTICIPANTS, LOCATIONS) %>% 
+dist_stats <- data0 %>% 
+  group_by(DISTRICT.NAME) %>% 
+  basic_stats(pipeline = T, prettify = F) %>% 
+  # function retains grouping
   ungroup() %>% 
-  right_join(dists_sf)
+  # keeping only necessary
+  dplyr::select(DISTRICT.NAME, SPECIES, LISTS.ALL, PARTICIPANTS, LOCATIONS) %>% 
+  complete(DISTRICT.NAME = cur_dists_sf$DISTRICT.NAME, 
+           fill = list(SPECIES = 0,
+                       LISTS.ALL = 0,
+                       PARTICIPANTS = 0,
+                       LOCATIONS = 0)) %>% 
+  right_join(cur_dists_sf %>% dplyr::select(-AREA)) %>% 
+  st_as_sf()
 
 
 # different breakpoints in visualisation
 if (cur_event$SHORT.CODE == "BiBC"){
   
-  break_at <- rev(c(0, 5, 10, 20, 30, max(na.omit(dist_stats$CHECKLISTS))))
+  break_at <- rev(c(0, 5, 10, 20, 30, max(na.omit(dist_stats$LISTS.ALL))))
   
 } else if (cur_event$SHORT.CODE == "PBC"){
   
-  break_at <- rev(c(0, 10, 50, 100, 250, max(na.omit(dist_stats$CHECKLISTS))))
+  break_at <- rev(c(0, 10, 50, 100, 250, max(na.omit(dist_stats$LISTS.ALL))))
   
 }
 
 
 mapviewOptions(fgb = FALSE)
-map_effort <- mapView(effortmap, 
-                      zcol = c("CHECKLISTS"), 
+map_effort <- mapView(dist_stats, 
+                      zcol = c("LISTS.ALL"), 
                       map.types = c("Esri.WorldImagery"),
-                      layer.name = c("CHECKLISTS - DISTRICTS"), 
+                      layer.name = c("Checklists - Districts"), 
                       popup = leafpop::popupTable(dist_stats,
-                                                  zcol = c("DISTRICT.NAME", "CHECKLISTS",
+                                                  zcol = c("DISTRICT.NAME", "LISTS.ALL",
                                                            "PARTICIPANTS", "LOCATIONS", "SPECIES"), 
                                                   feature.id = FALSE,
                                                   row.numbers = FALSE),
                       at = break_at, 
                       alpha.regions = 0.6)
+
+# webshot::install_phantomjs()
 mapshot(map_effort, 
-        file = glue("{cur_outpath}{cur_event$FULL.CODE}_distseffortmap.html"))
+        url = glue("{cur_outpath}{cur_event$FULL.CODE}_distseffortmap.html"))
 
 
 
@@ -299,11 +332,9 @@ palette_vals <- c("#869B27", "#E49B36", "#A13E2B", "#78CAE0", "#B69AC9", "#EA559
                   "#31954E", "#493F3D", "#CC6666", "#9999CC", "#000000", "#66CC99")[1:no_regions]
 
 
-region_map <- dists_sf %>% 
-  # joining region info
-  left_join(regions) %>% 
+region_map <- regions_sf %>% 
   ggplot() +
-  geom_sf(aes(fill = REGION1, geometry = geometry), colour = NA) +
+  geom_sf(aes(fill = REGION1, geometry = DISTRICT.GEOM), colour = NA) +
   # scale_x_continuous(expand = c(0,0)) +
   # scale_y_continuous(expand = c(0,0)) +
   theme(axis.line = element_blank(),

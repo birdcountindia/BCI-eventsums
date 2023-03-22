@@ -15,24 +15,11 @@ load(maindatapath)
 
 
 tictoc::tic("Joining mapvars to full data")
-temp <- data %>% 
-  group_by(GROUP.ID) %>% 
-  slice(1) %>% 
-  ungroup() %>% 
-  # joining map vars to EBD
-  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), remove = F) %>% 
-  st_set_crs(st_crs(dists_sf)) %>% 
-  st_join(dists_sf) %>% 
-  st_join(states_sf) %>% 
-  # PAs
-  st_join(g1_in_sf) %>% 
-  st_join(g2_in_sf) %>% 
-  st_join(g3_in_sf) %>% 
-  st_join(g4_in_sf) %>% 
-  st_drop_geometry()
 
-# joining GROUP.ID-mapvars info to full data
-data <- data %>% left_join(temp)
+sf_use_s2(FALSE)
+
+data <- join_map_sf(data)
+
 tictoc::toc()
 
 
