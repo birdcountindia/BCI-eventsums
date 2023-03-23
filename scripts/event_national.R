@@ -26,9 +26,37 @@ if (cur_event$SHORT.CODE == "GBBC"){
     filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE, 
                                      by = "days"))
   
+  
+  # previous years' data for GBBC
+  sched_event <- sched %>% filter(SHORT.CODE == cur_event$SHORT.CODE)
+  
+  data_all <- data %>% 
+    filter(YEAR %in% sched_event$EDITION) %>% 
+    group_by(YEAR) %>% 
+    left_join(sched_event %>% 
+                dplyr::select(EDITION, START.DATE, END.DATE), 
+              by = c("YEAR" = "EDITION")) %>% 
+    filter(OBSERVATION.DATE %in% seq(START.DATE, END.DATE, by = "days")) %>% 
+    ungroup() %>% 
+    mutate(START.DATE = NULL, END.DATE = NULL) %>% 
+    mutate(YEAR = factor(YEAR))
+  
+
+  # joining campus information to data for CBC
+  campus <- read_sheet("googlesheet") 
+  # names(campus)[1] = "LOCALITY.ID"
+  # names(campus)[2] = "CAMPUS"
+  
+  data_campus<- data0 %>% 
+    left_join(campus, by = "LOCALITY.ID") %>% 
+    filter(!is.na(CAMPUS))
+  
+
   # Joining mapvars to data
   sf_use_s2(FALSE)
   data0 <- join_map_sf(data0)
+  data_all <- join_map_sf(data_all)
+  data_campus <- join_map_sf(data_campus)
   
   
   cur_dists_sf <- dists_sf
@@ -77,8 +105,9 @@ regions_sf <- regions %>%
   dplyr::summarise()
 
 # adding regions to data
-data0 <- data0 %>% 
-  left_join(regions)
+data0 <- data0 %>% left_join(regions)
+data_all <- data_all %>% left_join(regions)
+data_campus <- data_campus %>% left_join(regions)
 
 
 # create and write a file with common and scientific names of all species
@@ -208,7 +237,7 @@ com_spec <- data0 %>%
   filter(LISTS.D > 10) %>%
   # repfreq
   group_by(COMMON.NAME, REGION1, DISTRICT.NAME) %>% 
-  summarise(REP.FREQ = n_distinct(GROUP.ID)/max(LISTS.D)) %>% 
+  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.D)) %>% 
   # averaging repfreq across different districts in region
   group_by(REGION1) %>% 
   mutate(NO.DIST = n_distinct(DISTRICT.NAME)) %>% 
@@ -383,18 +412,12 @@ ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_regionmap.png"),
        device = png, units = "in", width = 10, height = 7, dpi = 300)
 
 
-# yearly summaries --------------------------------------------------------
+# comparison with prev: yearly summaries --------------------------------------------------------
 
-# get previous data (and save current)
-###
-# data_all
-
-
-# summaries
 over_time <- data_all %>% 
-  mutate(YEAR = factor(YEAR)) %>% 
   group_by(YEAR) %>% 
   basic_stats(pipeline = T, prettify = T)
+
 
 data1 <- over_time %>%
   # keeping only necessary
@@ -482,3 +505,107 @@ plot4 <- ggplot(data4, aes(x = YEAR, y = VALUES, col = STAT)) +
                      limits = c(100, 500))
 
 
+ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_overtime_effort.png"), 
+       plot = plot1, 
+       device = png, units = "in", width = 10, height = 7, dpi = 300)
+
+ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_overtime_participation.png"), 
+       plot = plot2, 
+       device = png, units = "in", width = 10, height = 7, dpi = 300)
+
+ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_overtime_species.png"), 
+       plot = plot3, 
+       device = png, units = "in", width = 10, height = 7, dpi = 300)
+
+ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_overtime_spread.png"), 
+       plot = plot4, 
+       device = png, units = "in", width = 10, height = 7, dpi = 300)
+
+# comparison with prev: common species --------------------------------------------------------
+
+yearly_com_spec <- data_all %>%
+  filter(YEAR > 2015,
+         ALL.SPECIES.REPORTED == 1) %>%
+  # taking only districts with sufficient (10) lists to calculate REPFREQ
+  group_by(DISTRICT.NAME) %>% 
+  mutate(LISTS.D = n_distinct(GROUP.ID)) %>% 
+  ungroup() %>%
+  filter(LISTS.D > 10) %>%
+  # repfreq
+  group_by(YEAR, COMMON.NAME, DISTRICT.NAME) %>% 
+  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.D)) %>% 
+  # averaging repfreq across different districts in region
+  group_by(YEAR) %>% 
+  mutate(NO.DIST = n_distinct(DISTRICT.NAME)) %>% 
+  group_by(COMMON.NAME, YEAR) %>% 
+  summarise(REP.FREQ = sum(REP.FREQ)/max(NO.DIST)) %>% 
+  ungroup() %>% 
+  filter(COMMON.NAME %in% c("Common Myna","Rock Pigeon","Red-vented Bulbul"))
+
+plot_breaks <- seq(100, 500, 50)
+plot5 <- ggplot(yearly_com_spec, aes(x = YEAR, y = REP.FREQ, col = COMMON.NAME)) +
+  geom_point(size = 3, position = pos_dodge) +
+  geom_line(size = 1, position = pos_dodge) +
+  labs(x = "Years", y = "Frequency (%)") +
+  theme_mod_tufte() +
+  theme(axis.title.y = element_text(angle = 90, size = 16)) +
+  # scale_x_continuous(breaks = 2015:2023) +
+  scale_colour_manual(breaks = c("Common Myna", "Rock Pigeon", "Red-vented Bulbul"), 
+                      values = palette) 
+
+
+# Campus Bird Count -------------------------------------------------------
+
+# plot campus-wise stats on map
+
+campus_stats <- data_campus %>% 
+  group_by(CAMPUS) %>% 
+  basic_stats(pipeline = T, prettify = F) %>% 
+  # function retains grouping
+  ungroup() %>% 
+  # keeping only necessary
+  dplyr::select(CAMPUS, SPECIES, LISTS.ALL, LISTS.U, PARTICIPANTS) %>% 
+  complete(CAMPUS = campus$Name, 
+           fill = list(SPECIES = 0,
+                       LISTS.ALL = 0,
+                       LISTS.U = 0,
+                       PARTICIPANTS = 0,
+                       LOCATIONS = 0)) %>% 
+  right_join(cur_dists_sf %>% dplyr::select(-AREA)) %>% 
+  st_as_sf()
+
+
+# different breakpoints in visualisation
+
+max_lists <- max(na.omit(dist_stats$LISTS.ALL))
+break_at <- if (max_lists %in% 50:100) {
+  rev(c(0, 5, 10, 20, 30, max_lists))
+} else if (max_lists %in% 100:200) {
+  rev(c(0, 10, 25, 50, 90, max_lists))
+} else if (max_lists %in% 200:300) {
+  rev(c(0, 20, 50, 90, 150, max_lists))
+} else if (max_lists %in% 300:500) {
+  rev(c(0, 30, 80, 150, 250, max_lists))
+} else if (max_lists %in% 500:1000) {
+  rev(c(0, 30, 100, 200, 400, max_lists))
+} else if (max_lists > 1000) {
+  rev(c(0, 10, 50, 100, 250, 1000, max_lists))
+} 
+
+
+mapviewOptions(fgb = FALSE)
+map_effort_dist <- mapView(dist_stats, 
+                           zcol = c("LISTS.ALL"), 
+                           map.types = c("Esri.WorldImagery"),
+                           layer.name = c("Checklists per district"), 
+                           popup = leafpop::popupTable(dist_stats,
+                                                       zcol = c("DISTRICT.NAME", "LISTS.ALL",
+                                                                "PARTICIPANTS", "LOCATIONS", "SPECIES"), 
+                                                       feature.id = FALSE,
+                                                       row.numbers = FALSE),
+                           at = break_at, 
+                           alpha.regions = 0.6)
+
+# webshot::install_phantomjs()
+mapshot(map_effort_dist, 
+        url = glue("{cur_outpath}{cur_event$FULL.CODE}_distseffortmap.html"))
