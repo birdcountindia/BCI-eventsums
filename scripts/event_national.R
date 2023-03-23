@@ -558,6 +558,19 @@ plot5 <- ggplot(yearly_com_spec, aes(x = YEAR, y = REP.FREQ, col = COMMON.NAME))
 
 # plot campus-wise stats on map
 
+# most common species
+mostcom <- data_campus %>% 
+  group_by(COMMON.NAME, GROUP.ID) %>% 
+  slice(1) %>% 
+  group_by(CAMPUS) %>% 
+  mutate(LISTS.C = n_distinct(GROUP.ID)) %>% 
+  group_by(CAMPUS, COMMON.NAME) %>% 
+  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.C)) %>% 
+  arrange(desc(REP.FREQ)) %>% 
+  slice(1) %>% 
+  distinct(CAMPUS, COMMON.NAME) %>% 
+  rename(MOST.COM = COMMON.NAME)
+
 campus_stats <- data_campus %>% 
   group_by(CAMPUS) %>% 
   basic_stats(pipeline = T, prettify = F) %>% 
@@ -569,15 +582,32 @@ campus_stats <- data_campus %>%
            fill = list(SPECIES = 0,
                        LISTS.ALL = 0,
                        LISTS.U = 0,
-                       PARTICIPANTS = 0,
-                       LOCATIONS = 0)) %>% 
-  right_join(cur_dists_sf %>% dplyr::select(-AREA)) %>% 
+                       PARTICIPANTS = 0)) %>% 
+  left_join(mostcom) %>% 
+  arrange(desc(LISTS.ALL))
+
+write.csv(campus_stats, row.names = FALSE, 
+          file = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.csv"))
+
+
+campus_sf <- data_campus %>% 
+  distinct(CAMPUS, LONGITUDE, LATITUDE) %>% 
+  st_as_sf(coords = c(LONGITUDE, LATITUDE))
+
+campus_stats <- campus_stats %>% 
+  # renaming for map
+  rename(Campus = CAMPUS,
+         Species = SPECIES,
+         `Total checklists` = LISTS.ALL,
+         `Unique checklists` = LISTS.U,
+         Participants = PARTICIPANTS,
+         `Most common` = MOST.COM) %>% 
+  right_join(campus_sf, by = c("Campus" == "CAMPUS")) %>% 
   st_as_sf()
 
 
 # different breakpoints in visualisation
-
-max_lists <- max(na.omit(dist_stats$LISTS.ALL))
+max_lists <- max(na.omit(campus_stats$LISTS.ALL))
 break_at <- if (max_lists %in% 50:100) {
   rev(c(0, 5, 10, 20, 30, max_lists))
 } else if (max_lists %in% 100:200) {
@@ -594,18 +624,22 @@ break_at <- if (max_lists %in% 50:100) {
 
 
 mapviewOptions(fgb = FALSE)
-map_effort_dist <- mapView(dist_stats, 
-                           zcol = c("LISTS.ALL"), 
-                           map.types = c("Esri.WorldImagery"),
-                           layer.name = c("Checklists per district"), 
-                           popup = leafpop::popupTable(dist_stats,
-                                                       zcol = c("DISTRICT.NAME", "LISTS.ALL",
-                                                                "PARTICIPANTS", "LOCATIONS", "SPECIES"), 
-                                                       feature.id = FALSE,
-                                                       row.numbers = FALSE),
-                           at = break_at, 
-                           alpha.regions = 0.6)
+map_effort <- ( # state outlines
+  mapView(cur_states_sf, 
+          map.types = c("Esri.WorldImagery"), 
+          popup = FALSE, highlight = FALSE, legend = FALSE, 
+          label = NA, alpha.regions = 0)) +
+  (mapView(campus_stats, 
+           zcol = c("LISTS.ALL"), 
+           map.types = c("Esri.WorldImagery"),
+           layer.name = c("Checklists per campus"), 
+           popup = leafpop::popupTable(campus_stats,
+                                       zcol = c("Campus", "Total checklists", "Unique checklists",
+                                                "Participants", "Species", "Most common"), 
+                                       feature.id = FALSE,
+                                       row.numbers = FALSE),
+           at = break_at))
 
 # webshot::install_phantomjs()
-mapshot(map_effort_dist, 
-        url = glue("{cur_outpath}{cur_event$FULL.CODE}_distseffortmap.html"))
+mapshot(map_effort, 
+        url = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.html"))
