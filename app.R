@@ -120,7 +120,7 @@ server <- function(input, output) {
   output$sumPlot <- renderPlot({
 
     # plotting 
-    data_filt %>% 
+    data_sum() %>% 
       group_by(DAY.M) %>% 
       summarise(NO.LISTS = n_distinct(GROUP.ID)) %>% 
       ggplot() +
