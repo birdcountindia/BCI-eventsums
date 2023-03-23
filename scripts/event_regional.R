@@ -238,7 +238,7 @@ com_spec <- data0 %>%
   filter(LISTS.D > 5) %>%
   # repfreq
   group_by(COMMON.NAME, REGION1, DISTRICT.NAME) %>% 
-  summarise(REP.FREQ = n_distinct(GROUP.ID)/max(LISTS.D)) %>% 
+  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.D)) %>% 
   # averaging repfreq across different districts in region
   group_by(REGION1) %>% 
   mutate(NO.DIST = n_distinct(DISTRICT.NAME)) %>% 
