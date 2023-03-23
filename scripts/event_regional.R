@@ -146,6 +146,7 @@ data0 <- data0 %>%
 # useful for mapping
 temp <- data0 %>%
   filter(CATEGORY == "species" | CATEGORY == "issf") %>%
+  filter(!EXOTIC.CODE %in% c("X")) %>%
   distinct(COMMON.NAME)
 
 write.csv(temp, row.names = FALSE, 
@@ -222,7 +223,7 @@ write_xlsx(x = list("Overall stats" = overall_stats,
 reg_stats <- data0 %>% 
   filter(!is.na(REGION1)) %>% 
   group_by(REGION1) %>% 
-  basic_stats(prettify = F) %>% 
+  basic_stats(pipeline = T, prettify = F) %>% 
   # keeping only necessary
   dplyr::select(SPECIES, LISTS.ALL) %>% 
   ungroup() 
@@ -275,15 +276,6 @@ dist_stats <- data0 %>%
 
 
 # different breakpoints in visualisation
-if (cur_event$SHORT.CODE == "BiBC"){
-  
-  break_at <- rev(c(0, 5, 10, 20, 30, max(na.omit(dist_stats$LISTS.ALL))))
-  
-} else if (cur_event$SHORT.CODE == "PBC"){
-  
-  break_at <- rev(c(0, 10, 50, 100, 250, max(na.omit(dist_stats$LISTS.ALL))))
-  
-}
 
 max_lists <- max(na.omit(dist_stats$LISTS.ALL))
 break_at <- if (max_lists %in% 50:100) {
@@ -351,8 +343,7 @@ ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_pointdistmap.png"),
 theme_set(theme_tufte())
 
 
-palette_vals <- c("#869B27", "#E49B36", "#A13E2B", "#78CAE0", "#B69AC9", "#EA5599", 
-                  "#31954E", "#493F3D", "#CC6666", "#9999CC", "#000000", "#66CC99")[1:no_regions]
+palette_vals <- palette[1:no_regions]
 
 
 region_map <- regions_sf %>% 

@@ -32,3 +32,9 @@ filtGA <- groupaccs %>%
 data <- data %>% 
   left_join(eBird_users, by = "OBSERVER.ID") %>% 
   anti_join(filtGA, by = "OBSERVER.ID")
+
+
+# palette for plots -------------------------------------------------------
+
+palette <- c("#869B27", "#E49B36", "#A13E2B", "#78CAE0", "#B69AC9", "#EA5599", 
+             "#31954E", "#493F3D", "#CC6666", "#9999CC", "#000000", "#66CC99")
