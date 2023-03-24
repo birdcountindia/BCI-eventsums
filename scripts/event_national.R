@@ -42,9 +42,15 @@ if (cur_event$SHORT.CODE == "GBBC"){
   
 
   # joining campus information to data for CBC
-  campus <- read_sheet("googlesheet") 
-  # names(campus)[1] = "LOCALITY.ID"
-  # names(campus)[2] = "CAMPUS"
+  campus <- read_sheet("https://docs.google.com/spreadsheets/d/1ZPCO_Yy7jjKlP3RYdT5ostbsS1G0zvgsl7IJ5mLoIzA/edit?usp=sharing",
+                       sheet = glue("{cur_year}")) %>% 
+    magrittr::set_colnames(c("CAMPUS", "LOCALITY.ID")) %>% 
+    # some campuses with >1 hotspot have listed multiple IDs in one row
+    group_by(CAMPUS) %>% 
+    separate_rows(LOCALITY.ID, sep = ",") %>% 
+    mutate(LOCALITY.ID = str_trim(LOCALITY.ID, side = "both")) %>% 
+    ungroup()
+
   
   data_campus<- data0 %>% 
     left_join(campus, by = "LOCALITY.ID") %>% 
@@ -596,7 +602,7 @@ write.csv(campus_stats, row.names = FALSE,
 
 campus_sf <- data_campus %>% 
   distinct(CAMPUS, LONGITUDE, LATITUDE) %>% 
-  st_as_sf(coords = c(LONGITUDE, LATITUDE))
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"))
 
 campus_stats <- campus_stats %>% 
   # renaming for map
@@ -606,26 +612,27 @@ campus_stats <- campus_stats %>%
          `Unique checklists` = LISTS.U,
          Participants = PARTICIPANTS,
          `Most common` = MOST.COM) %>% 
-  right_join(campus_sf, by = c("Campus" == "CAMPUS")) %>% 
+  right_join(campus_sf, by = c("Campus" = "CAMPUS")) %>% 
   st_as_sf()
 
 
 # different breakpoints in visualisation
-max_lists <- max(na.omit(campus_stats$LISTS.ALL))
-break_at <- if (max_lists %in% 50:100) {
-  rev(c(0, 5, 10, 20, 30, max_lists))
-} else if (max_lists %in% 100:200) {
-  rev(c(0, 10, 25, 50, 90, max_lists))
-} else if (max_lists %in% 200:300) {
+max_lists <- max(na.omit(campus_stats$`Total checklists`))
+break_at <- if (max_lists %in% 200:300) {
   rev(c(0, 20, 50, 90, 150, max_lists))
 } else if (max_lists %in% 300:500) {
   rev(c(0, 30, 80, 150, 250, max_lists))
 } else if (max_lists %in% 500:1000) {
   rev(c(0, 30, 100, 200, 400, max_lists))
-} else if (max_lists > 1000) {
+} else if (max_lists %in% 1000:2000) {
   rev(c(0, 10, 50, 100, 250, 1000, max_lists))
+} else if (max_lists %in% 2000:4000) {
+  rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
+} else if (max_lists %in% 4000:8000) {
+  rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
+} else if (max_lists > 8000) {
+  rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
-
 
 mapviewOptions(fgb = FALSE)
 map_effort <- ( # state outlines
@@ -634,7 +641,7 @@ map_effort <- ( # state outlines
           popup = FALSE, highlight = FALSE, legend = FALSE, 
           label = NA, alpha.regions = 0)) +
   (mapView(campus_stats, 
-           zcol = c("LISTS.ALL"), 
+           zcol = c("Total checklists"), 
            map.types = c("Esri.WorldImagery"),
            layer.name = c("Checklists per campus"), 
            popup = leafpop::popupTable(campus_stats,
