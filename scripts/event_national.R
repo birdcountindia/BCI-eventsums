@@ -28,7 +28,7 @@ if (cur_event$SHORT.CODE == "GBBC"){
   
   
   # previous years' data for GBBC
-  sched_event <- sched %>% filter(SHORT.CODE == cur_event$SHORT.CODE)
+  sched_event <- sched0 %>% filter(SHORT.CODE == cur_event$SHORT.CODE)
   
   data_all <- data %>% 
     filter(YEAR %in% sched_event$EDITION) %>% 
@@ -36,10 +36,9 @@ if (cur_event$SHORT.CODE == "GBBC"){
     left_join(sched_event %>% 
                 dplyr::select(EDITION, START.DATE, END.DATE), 
               by = c("YEAR" = "EDITION")) %>% 
-    filter(OBSERVATION.DATE %in% seq(START.DATE, END.DATE, by = "days")) %>% 
+    filter(OBSERVATION.DATE >= START.DATE & OBSERVATION.DATE <= END.DATE) %>% 
     ungroup() %>% 
-    mutate(START.DATE = NULL, END.DATE = NULL) %>% 
-    mutate(YEAR = factor(YEAR))
+    mutate(START.DATE = NULL, END.DATE = NULL)
   
 
   # joining campus information to data for CBC
@@ -59,11 +58,12 @@ if (cur_event$SHORT.CODE == "GBBC"){
   data_campus <- join_map_sf(data_campus)
   
   
+  # national event so whole map
   cur_dists_sf <- dists_sf
   cur_states_sf <- states_sf
   
   
-  regions <- cur_dists_sf %>% 
+  regions <- cur_states_sf %>% 
     st_drop_geometry() %>% 
     dplyr::select(STATE.NAME) %>% 
     mutate(REGION1 = case_when(STATE.NAME %in% c("Punjab", "Haryana", "Uttar Pradesh", 
@@ -98,8 +98,9 @@ if (cur_event$SHORT.CODE == "GBBC"){
 
 # sf for regions
 regions_sf <- regions %>% 
-  left_join(cur_states_sf) %>% 
-  st_as_sf() %>% 
+  left_join(cur_states_sf %>% dplyr::select(-AREA)) %>% 
+  st_as_sf() %>%
+  st_make_valid() %>% # otherwise below results in TopologyException error
   # joins multiple polygons into one for each region
   group_by(REGION1) %>% 
   dplyr::summarise()
@@ -269,36 +270,37 @@ dist_stats <- data0 %>%
                        LISTS.ALL = 0,
                        PARTICIPANTS = 0,
                        LOCATIONS = 0)) %>% 
-  right_join(cur_dists_sf %>% dplyr::select(-AREA)) %>% 
+  magrittr::set_colnames(c("District", "Species", "Total checklists", "Participants",
+                           "Locations")) %>% 
+  right_join(cur_dists_sf %>% dplyr::select(-AREA),
+             by = c("District" = "DISTRICT.NAME")) %>% 
   st_as_sf()
 
 
 # different breakpoints in visualisation
 
-max_lists <- max(na.omit(dist_stats$LISTS.ALL))
-break_at <- if (max_lists %in% 50:100) {
-  rev(c(0, 5, 10, 20, 30, max_lists))
-} else if (max_lists %in% 100:200) {
-  rev(c(0, 10, 25, 50, 90, max_lists))
-} else if (max_lists %in% 200:300) {
-  rev(c(0, 20, 50, 90, 150, max_lists))
-} else if (max_lists %in% 300:500) {
-  rev(c(0, 30, 80, 150, 250, max_lists))
-} else if (max_lists %in% 500:1000) {
+max_lists <- max(na.omit(dist_stats$`Total checklists`))
+break_at <- if (max_lists %in% 500:1000) {
   rev(c(0, 30, 100, 200, 400, max_lists))
-} else if (max_lists > 1000) {
+} else if (max_lists %in% 1000:2000) {
   rev(c(0, 10, 50, 100, 250, 1000, max_lists))
+} else if (max_lists %in% 2000:4000) {
+  rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
+} else if (max_lists %in% 4000:8000) {
+  rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
+} else if (max_lists > 8000) {
+  rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
 
 
 mapviewOptions(fgb = FALSE)
 map_effort_dist <- mapView(dist_stats, 
-                      zcol = c("LISTS.ALL"), 
+                      zcol = c("Total checklists"), 
                       map.types = c("Esri.WorldImagery"),
                       layer.name = c("Checklists per district"), 
                       popup = leafpop::popupTable(dist_stats,
-                                                  zcol = c("DISTRICT.NAME", "LISTS.ALL",
-                                                           "PARTICIPANTS", "LOCATIONS", "SPECIES"), 
+                                                  zcol = c("District", "Total checklists", 
+                                                           "Participants", "Locations", "Species"), 
                                                   feature.id = FALSE,
                                                   row.numbers = FALSE),
                       at = break_at, 
@@ -323,32 +325,37 @@ state_stats <- data0 %>%
                        LISTS.ALL = 0,
                        PARTICIPANTS = 0,
                        LOCATIONS = 0)) %>% 
-  right_join(cur_states_sf %>% dplyr::select(-AREA)) %>% 
+  magrittr::set_colnames(c("State", "Species", "Total checklists", "Participants",
+                           "Locations")) %>% 
+  right_join(cur_states_sf %>% dplyr::select(-AREA),
+             by = c("State" = "STATE.NAME")) %>% 
   st_as_sf()
 
 
 # different breakpoints in visualisation
 
-max_lists <- max(na.omit(state_stats$LISTS.ALL))
+max_lists <- max(na.omit(state_stats$`Total checklists`))
 break_at <- if (max_lists %in% 500:1000) {
   rev(c(0, 30, 100, 200, 400, max_lists))
 } else if (max_lists %in% 1000:2000) {
   rev(c(0, 10, 50, 100, 250, 1000, max_lists))
-} else if (max_lists %in% 2000:5000) {
+} else if (max_lists %in% 2000:4000) {
   rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
-} else if (max_lists > 5000) {
-  rev(c(0, 30, 100, 200, 500, 1000, 3000, 5000, max_lists))
+} else if (max_lists %in% 4000:8000) {
+  rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
+} else if (max_lists > 8000) {
+  rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
 
 
 mapviewOptions(fgb = FALSE)
 map_effort_state <- mapView(state_stats, 
-                      zcol = c("LISTS.ALL"), 
+                      zcol = c("Total checklists"), 
                       map.types = c("Esri.WorldImagery"),
                       layer.name = c("Checklists per state"), 
-                      popup = leafpop::popupTable(dist_stats,
-                                                  zcol = c("STATE.NAME", "LISTS.ALL",
-                                                           "PARTICIPANTS", "LOCATIONS", "SPECIES"), 
+                      popup = leafpop::popupTable(state_stats,
+                                                  zcol = c("State", "Total checklists", 
+                                                           "Participants", "Locations", "Species"), 
                                                   feature.id = FALSE,
                                                   row.numbers = FALSE),
                       at = break_at, 
@@ -358,12 +365,6 @@ map_effort_state <- mapView(state_stats,
 mapshot(map_effort_state, 
         url = glue("{cur_outpath}{cur_event$FULL.CODE}_stateseffortmap.html"))
 
-
-
-# combining dist and state maps
-map_effort <- map_effort_dist + map_effort_state
-
-mapshot(map_effort, url = glue("{cur_outpath}{cur_event$FULL.CODE}_statesdistseffortmap.html"))
 
 # plot point map ----------------------------------------------------------
 
@@ -421,35 +422,38 @@ over_time <- data_all %>%
 
 data1 <- over_time %>%
   # keeping only necessary
-  dplyr::select(`person hours`, `lists (all types)`, `unique lists`) %>% 
-  magrittr::set_colnames("Person hours", "Total checklists", "Unique checklists") %>% 
-  pivot_longer(everything(), names_to = "STAT", values_to = "VALUES")
+  dplyr::select(YEAR, `person hours`, `lists (all types)`, `unique lists`) %>% 
+  magrittr::set_colnames(c("YEAR", "Person hours", "Total checklists", "Unique checklists")) %>% 
+  pivot_longer(!matches("YEAR"), names_to = "STAT", values_to = "VALUES") %>% 
+  ungroup()
   
 data2 <- over_time %>% 
   # keeping only necessary
-  dplyr::select(`eBirders`) %>% 
-  magrittr::set_colnames("Participants") %>% 
-  pivot_longer(everything(), names_to = "STAT", values_to = "VALUES")
+  dplyr::select(YEAR, `eBirders`) %>% 
+  magrittr::set_colnames(c("YEAR", "Participants")) %>% 
+  pivot_longer(!matches("YEAR"), names_to = "STAT", values_to = "VALUES") %>% 
+  ungroup()
 
 data3 <- over_time %>% 
   # keeping only necessary
-  dplyr::select(`species`) %>% 
-  magrittr::set_colnames("Species") %>% 
-  pivot_longer(everything(), names_to = "STAT", values_to = "VALUES")
+  dplyr::select(YEAR, `species`) %>% 
+  magrittr::set_colnames(c("YEAR", "Species")) %>% 
+  pivot_longer(!matches("YEAR"), names_to = "STAT", values_to = "VALUES") %>% 
+  ungroup()
 
 # number of districts calc
 data4 <- data_all %>% 
-  mutate(YEAR = factor(YEAR)) %>% 
   group_by(YEAR) %>% 
   summarise(VALUES = n_distinct(DISTRICT.NAME),
-            STAT = "Districts")
+            STAT = "Districts") 
 
 
 require(extrafont)
 pos_dodge <- position_dodge(0.2)
+source("scripts/functions_plot.R")
 
 
-plot_breaks <- c(0,6000,12000,18000,24000,30000,36000,42000)
+plot_breaks <- seq(0, 56000, 8000)
 plot1 <- ggplot(data1, aes(x = YEAR, y = VALUES, col = STAT)) +
   geom_point(size = 3) +
   geom_line(size = 1) +
@@ -457,7 +461,7 @@ plot1 <- ggplot(data1, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Unique checklists", "Total checklists", "Person hours"), 
                       values = palette) +
-  # scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
                      limits = c(min(plot_breaks), max(plot_breaks + 1000)))
@@ -471,7 +475,7 @@ plot2 <- ggplot(data2, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Participants"), 
                       values = palette) +
-  # scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks))
 
@@ -485,7 +489,7 @@ plot3 <- ggplot(data3, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Species"), 
                       values = palette) +
-  # scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
                      limits = c(580, 1100))
@@ -499,7 +503,7 @@ plot4 <- ggplot(data4, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Districts"), 
                       values = palette) +
-  # scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
                      # labels = scales::label_comma()(plot_breaks),
                      limits = c(100, 500))
@@ -549,7 +553,7 @@ plot5 <- ggplot(yearly_com_spec, aes(x = YEAR, y = REP.FREQ, col = COMMON.NAME))
   labs(x = "Years", y = "Frequency (%)") +
   theme_mod_tufte() +
   theme(axis.title.y = element_text(angle = 90, size = 16)) +
-  # scale_x_continuous(breaks = 2015:2023) +
+  scale_x_continuous(breaks = 2015:2023) +
   scale_colour_manual(breaks = c("Common Myna", "Rock Pigeon", "Red-vented Bulbul"), 
                       values = palette) 
 
