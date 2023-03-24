@@ -52,9 +52,12 @@ if (cur_event$SHORT.CODE == "GBBC"){
     ungroup()
 
   
-  data_campus<- data0 %>% 
-    left_join(campus, by = "LOCALITY.ID") %>% 
-    filter(!is.na(CAMPUS))
+  data_campus <- data0 %>% 
+    right_join(campus, by = "LOCALITY.ID") %>% 
+    # using eBird location names instead of campus names filled in GForm
+    mutate(CAMPUS = LOCALITY) %>% 
+    # filtering out campuses that registered but did not upload lists
+    filter(!is.na(SAMPLING.EVENT.IDENTIFIER))
   
 
   # Joining mapvars to data
@@ -588,7 +591,7 @@ campus_stats <- data_campus %>%
   ungroup() %>% 
   # keeping only necessary
   dplyr::select(CAMPUS, SPECIES, LISTS.ALL, LISTS.U, PARTICIPANTS) %>% 
-  complete(CAMPUS = campus$Name, 
+  complete(CAMPUS = unique(data_campus$CAMPUS), 
            fill = list(SPECIES = 0,
                        LISTS.ALL = 0,
                        LISTS.U = 0,
