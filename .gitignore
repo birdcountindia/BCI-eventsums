@@ -11,3 +11,4 @@
 *.txt
 
 outputs/*/*/*_files/
+outputs/GBBC/*/*.html
