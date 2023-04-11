@@ -60,7 +60,7 @@ if (anyevent == FALSE) {
     
   }
   
-  
+
   if (rlang::is_empty(list_multiregional$FULL.NAME)) {
     
     print("No multi-regional events.")

@@ -28,6 +28,16 @@ filtGA <- groupaccs %>%
   filter(CATEGORY == "GA.1" | CATEGORY == "GA.2") %>% 
   select(OBSERVER.ID)
 
+# including some group accounts for GBBC like Salem School Students accounts
+if (any(list_national$SHORT.CODE == "GBBC")){
+ 
+  exceptions <- groupaccs %>% 
+    filter(str_detect(FULL.NAME, "Salem") & str_detect(FULL.NAME, "School Students") |
+             str_detect(FULL.NAME, "Salem Ornithological Foundation"))
+    
+  filtGA <- filtGA %>% anti_join(exceptions)
+
+  }
 
 data <- data %>% 
   left_join(eBird_users, by = "OBSERVER.ID") %>% 
