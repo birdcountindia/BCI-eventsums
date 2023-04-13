@@ -137,8 +137,13 @@ rm(temp)
 # overall stats
 overall_stats <- basic_stats(data0)
 
+
+# for birder stats, removing all GAs
+data_birder <- data0 %>% 
+  anti_join(filtGA_birder, by = "OBSERVER.ID")
+
 # top 30 checklist uploaders (eligible list filter)
-top30 <- data0 %>% 
+top30 <- data_birder %>% 
   filter(ALL.SPECIES.REPORTED == 1, DURATION.MINUTES >= 14) %>% 
   group_by(OBSERVER.ID, FULL.NAME) %>% 
   summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER)) %>% 
@@ -147,7 +152,7 @@ top30 <- data0 %>%
   slice(1:30)
  
 # top birders per state
-top_state <- data0 %>% 
+top_state <- data_birder %>% 
   filter(ALL.SPECIES.REPORTED == 1, DURATION.MINUTES >= 14) %>% 
   filter(!is.na(STATE)) %>% 
   group_by(STATE.NAME, OBSERVER.ID, FULL.NAME) %>% 
@@ -162,7 +167,7 @@ top_state <- data0 %>%
   arrange(desc(NO.LISTS)) 
   
 # list of birders per state
-birder_state <- data0 %>%
+birder_state <- data_birder %>%
   # some lists in eBird data have no state name
   filter(!is.na(STATE)) %>% 
   distinct(STATE.NAME, OBSERVER.ID) %>%
@@ -232,7 +237,7 @@ write_xlsx(x = list("Overall stats" = overall_stats,
 reg_stats <- data0 %>% 
   filter(!is.na(REGION1)) %>% 
   group_by(REGION1) %>% 
-  basic_stats(prettify = F) %>% 
+  basic_stats(prettify = F, pipeline = T) %>% 
   # keeping only necessary
   dplyr::select(SPECIES, LISTS.ALL) %>% 
   ungroup() 
