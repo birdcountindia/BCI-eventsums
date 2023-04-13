@@ -26,9 +26,17 @@ groupaccs <- read_csv(groupaccspath) %>%
 filtGA <- groupaccs %>% 
   # both categories need to be filtered because this is birder-related 
   filter(CATEGORY == "GA.1" | CATEGORY == "GA.2") %>% 
-  select(OBSERVER.ID)
+  select(OBSERVER.ID) %>% 
+  # other group accs
+  bind_rows(data.frame(OBSERVER.ID = c("obsr852457", "obsr949737", "obsr3585830", 
+                                       "obsr2972613", "obsr1927965",
+                                       "obsr2991603", "obsr3000697")))
+
 
 # including some group accounts for GBBC like Salem School Students accounts
+
+filtGA_birder <- filtGA
+
 if (any(list_national$SHORT.CODE == "GBBC")){
  
   exceptions <- groupaccs %>% 
