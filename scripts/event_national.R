@@ -7,6 +7,7 @@ require(mapview)
 require(leaflet)
 require(writexl)
 require(ggthemes)
+library(rmapshaper)
 
 
 # paths
@@ -307,6 +308,11 @@ break_at <- if (max_lists %in% 500:1000) {
 } 
 
 
+# simplifying the spatial features
+dist_stats <- dist_stats %>% 
+  ms_simplify(keep = 0.05, keep_shapes = FALSE)
+
+
 mapviewOptions(fgb = FALSE)
 map_effort_dist <- mapView(dist_stats, 
                       zcol = c("Total checklists"), 
@@ -361,6 +367,10 @@ break_at <- if (max_lists %in% 500:1000) {
   rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
 
+
+# simplifying the spatial features
+state_stats <- state_stats %>% 
+  ms_simplify(keep = 0.05, keep_shapes = FALSE)
 
 mapviewOptions(fgb = FALSE)
 map_effort_state <- mapView(state_stats, 
@@ -641,6 +651,10 @@ break_at <- if (max_lists %in% 200:300) {
 } else if (max_lists > 8000) {
   rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
+
+
+# simplifying the spatial features
+cur_states_sf <- cur_states_sf %>% ms_simplify(keep = 0.05, keep_shapes = FALSE)
 
 mapviewOptions(fgb = FALSE)
 map_effort <- ( # state outlines
