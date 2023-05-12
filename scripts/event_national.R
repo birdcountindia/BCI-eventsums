@@ -21,12 +21,12 @@ source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/mapp
 # preparing data ----------------------------------------------------------
 
 # filtering for loc & dates
+
+data0 <- data %>% 
+  filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE, 
+                                   by = "days"))
+
 if (cur_event$SHORT.CODE == "GBBC"){
-  
-  data0 <- data %>% 
-    filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE, 
-                                     by = "days"))
-  
   
   # previous years' data for GBBC
   sched_event <- sched0 %>% filter(SHORT.CODE == cur_event$SHORT.CODE)
@@ -59,52 +59,81 @@ if (cur_event$SHORT.CODE == "GBBC"){
     mutate(CAMPUS = LOCALITY) %>% 
     # filtering out campuses that registered but did not upload lists
     filter(!is.na(SAMPLING.EVENT.IDENTIFIER))
-  
 
   # Joining mapvars to data
   sf_use_s2(FALSE)
   data0 <- join_map_sf(data0)
   data_all <- join_map_sf(data_all)
   data_campus <- join_map_sf(data_campus)
+
+  # national event so whole map
+  cur_dists_sf <- dists_sf
+  cur_states_sf <- states_sf
+
+} else if (cur_event$SHORT.CODE == "EBD"){
   
+  # previous years' data for GBBC
+  sched_event <- sched0 %>% filter(SHORT.CODE == cur_event$SHORT.CODE)
+  
+  data_all <- data %>% 
+    filter(YEAR %in% sched_event$EDITION) %>% 
+    group_by(YEAR) %>% 
+    left_join(sched_event %>% 
+                dplyr::select(EDITION, START.DATE, END.DATE), 
+              by = c("YEAR" = "EDITION")) %>% 
+    filter(OBSERVATION.DATE >= START.DATE & OBSERVATION.DATE <= END.DATE) %>% 
+    ungroup() %>% 
+    mutate(START.DATE = NULL, END.DATE = NULL)
+  
+  
+  # Joining mapvars to data
+  sf_use_s2(FALSE)
+  data0 <- join_map_sf(data0)
+  data_all <- join_map_sf(data_all)
   
   # national event so whole map
   cur_dists_sf <- dists_sf
   cur_states_sf <- states_sf
   
-  
-  regions <- cur_states_sf %>% 
-    st_drop_geometry() %>% 
-    dplyr::select(STATE.NAME) %>% 
-    mutate(REGION1 = case_when(STATE.NAME %in% c("Punjab", "Haryana", "Uttar Pradesh", 
-                                                 "Delhi", "Bihar", "Chandigarh")
-                               ~ "North",
-                               STATE.NAME %in% c("Gujarat","Rajasthan",
-                                                 "Dadra and Nagar Haveli","Daman and Diu")
-                               ~ "West",
-                               STATE.NAME %in% c("Jammu and Kashmir", "Ladakh", 
-                                                 "Uttarakhand", "Himachal Pradesh")
-                               ~ "Himalaya",
-                               STATE.NAME %in% c("Madhya Pradesh", "Chhattisgarh", 
-                                                 "Maharashtra", "Jharkhand", "Odisha")
-                               ~ "Central",
-                               STATE.NAME %in% c("Andhra Pradesh", "Telangana", "Karnataka",
-                                                 "Kerala", "Tamil Nadu", "Goa", "Puducherry")
-                               ~ "South",
-                               STATE.NAME %in% c("Arunachal Pradesh", "Nagaland", "Manipur",
-                                                 "Tripura", "Mizoram", "Sikkim", 
-                                                 "West Bengal", "Assam", "Meghalaya")
-                               ~ "East",
-                               STATE.NAME %in% c("Andaman and Nicobar Islands", 
-                                                 "Lakshadweep")
-                               ~ "A&N")) %>% 
-    mutate(REGION1 = factor(REGION1, 
-                            levels = c("A&N", "Central", "East", "Himalaya", 
-                                       "North", "South", "West")))
-  
-  no_regions <- n_distinct(regions$REGION1)
-  
-} 
+}
+
+regions <- cur_states_sf %>% 
+  st_drop_geometry() %>% 
+  dplyr::select(STATE.NAME) %>% 
+  mutate(REGION1 = case_when(STATE.NAME %in% c("Punjab", "Haryana", "Uttar Pradesh", 
+                                               "Delhi", "Bihar", "Chandigarh")
+                             ~ "North",
+                             STATE.NAME %in% c("Gujarat","Rajasthan",
+                                               "Dadra and Nagar Haveli","Daman and Diu")
+                             ~ "West",
+                             STATE.NAME %in% c("Jammu and Kashmir", "Ladakh", 
+                                               "Uttarakhand", "Himachal Pradesh")
+                             ~ "Himalaya",
+                             STATE.NAME %in% c("Madhya Pradesh", "Chhattisgarh", 
+                                               "Maharashtra", "Jharkhand", "Odisha")
+                             ~ "Central",
+                             STATE.NAME %in% c("Andhra Pradesh", "Telangana", "Karnataka",
+                                               "Kerala", "Tamil Nadu", "Goa", "Puducherry")
+                             ~ "South",
+                             STATE.NAME %in% c("Arunachal Pradesh", "Nagaland", "Manipur",
+                                               "Tripura", "Mizoram", "Sikkim", 
+                                               "West Bengal", "Assam", "Meghalaya")
+                             ~ "East",
+                             STATE.NAME %in% c("Andaman and Nicobar Islands", 
+                                               "Lakshadweep")
+                             ~ "A&N")) %>% 
+  mutate(REGION1 = factor(REGION1, 
+                          levels = c("A&N", "Central", "East", "Himalaya", 
+                                     "North", "South", "West")))
+
+no_regions <- n_distinct(regions$REGION1)
+
+# adding regions to data
+data0 <- data0 %>% left_join(regions)
+data_all <- data_all %>% left_join(regions)
+if (cur_event$SHORT.CODE == "GBBC"){
+  data_campus <- data_campus %>% left_join(regions)
+}
 
 # sf for regions
 regions_sf <- regions %>% 
@@ -114,11 +143,6 @@ regions_sf <- regions %>%
   # joins multiple polygons into one for each region
   group_by(REGION1) %>% 
   dplyr::summarise()
-
-# adding regions to data
-data0 <- data0 %>% left_join(regions)
-data_all <- data_all %>% left_join(regions)
-data_campus <- data_campus %>% left_join(regions)
 
 
 # create and write a file with common and scientific names of all species
@@ -222,6 +246,27 @@ state_day_sum <- data0 %>%
   arrange(STATE.NAME, DAY.M)
 
 
+
+overall_com_spec <- data0 %>%
+  filter(ALL.SPECIES.REPORTED == 1) %>%
+  # taking only districts with sufficient (10) lists to calculate REPFREQ
+  group_by(STATE.NAME) %>% 
+  mutate(LISTS.ST = n_distinct(GROUP.ID)) %>% 
+  ungroup() %>%
+  filter(LISTS.ST > 10) %>%
+  # repfreq
+  group_by(COMMON.NAME, STATE.NAME) %>% 
+  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.ST)) %>% 
+  # averaging repfreq across states
+  ungroup() %>% 
+  mutate(NO.STATES = n_distinct(STATE.NAME)) %>% 
+  group_by(COMMON.NAME) %>% 
+  summarise(REP.FREQ = sum(REP.FREQ)/max(NO.STATES)) %>% 
+  ungroup() %>% 
+  # top 5 per region
+  arrange(desc(REP.FREQ))
+
+
 write_xlsx(x = list("Overall stats" = overall_stats, 
                     "Top 30 checklist uploaders" = top30, 
                     "Top birders per state" = top_state,
@@ -229,9 +274,9 @@ write_xlsx(x = list("Overall stats" = overall_stats,
                     "Summary per district" = dist_sum,
                     "Summary per state" = state_sum,
                     "Summary per day" = day_sum,
-                    "Summary per state-day" = state_day_sum),
+                    "Summary per state-day" = state_day_sum,
+                    "Overall common species" = overall_com_spec),
            path = glue("{cur_outpath}{cur_event$FULL.CODE}_stats.xlsx"))
-
 
 # regional summaries and common species -----------------------------------
 
@@ -244,7 +289,7 @@ reg_stats <- data0 %>%
   ungroup() 
 
 
-com_spec <- data0 %>%
+reg_com_spec <- data0 %>%
   filter(ALL.SPECIES.REPORTED == 1) %>%
   # taking only districts with sufficient (10) lists to calculate REPFREQ
   group_by(DISTRICT.NAME) %>% 
@@ -267,7 +312,7 @@ com_spec <- data0 %>%
 
 
 write_xlsx(x = list("Stats" = reg_stats, 
-                    "Common species" = com_spec),
+                    "Common species" = reg_com_spec),
            path = glue("{cur_outpath}{cur_event$FULL.CODE}_regions.xlsx"))
 
 
@@ -584,95 +629,99 @@ plot5 <- ggplot(yearly_com_spec, aes(x = YEAR, y = REP.FREQ, col = COMMON.NAME))
 
 # Campus Bird Count -------------------------------------------------------
 
-# plot campus-wise stats on map
-
-# most common species
-mostcom <- data_campus %>% 
-  group_by(COMMON.NAME, GROUP.ID) %>% 
-  slice(1) %>% 
-  group_by(CAMPUS) %>% 
-  mutate(LISTS.C = n_distinct(GROUP.ID)) %>% 
-  group_by(CAMPUS, COMMON.NAME) %>% 
-  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.C)) %>% 
-  arrange(desc(REP.FREQ)) %>% 
-  slice(1) %>% 
-  distinct(CAMPUS, COMMON.NAME) %>% 
-  rename(MOST.COM = COMMON.NAME)
-
-campus_stats <- data_campus %>% 
-  group_by(CAMPUS) %>% 
-  basic_stats(pipeline = T, prettify = F) %>% 
-  # function retains grouping
-  ungroup() %>% 
-  # keeping only necessary
-  dplyr::select(CAMPUS, SPECIES, LISTS.ALL, LISTS.U, PARTICIPANTS) %>% 
-  complete(CAMPUS = unique(data_campus$CAMPUS), 
-           fill = list(SPECIES = 0,
-                       LISTS.ALL = 0,
-                       LISTS.U = 0,
-                       PARTICIPANTS = 0)) %>% 
-  left_join(mostcom) %>% 
-  arrange(desc(LISTS.ALL))
-
-write.csv(campus_stats, row.names = FALSE, 
-          file = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.csv"))
-
-
-campus_sf <- data_campus %>% 
-  distinct(CAMPUS, LONGITUDE, LATITUDE) %>% 
-  st_as_sf(coords = c("LONGITUDE", "LATITUDE"))
-
-campus_stats <- campus_stats %>% 
-  # renaming for map
-  rename(Campus = CAMPUS,
-         Species = SPECIES,
-         `Total checklists` = LISTS.ALL,
-         `Unique checklists` = LISTS.U,
-         Participants = PARTICIPANTS,
-         `Most common` = MOST.COM) %>% 
-  right_join(campus_sf, by = c("Campus" = "CAMPUS")) %>% 
-  st_as_sf()
-
-
-# different breakpoints in visualisation
-max_lists <- max(na.omit(campus_stats$`Total checklists`))
-break_at <- if (max_lists %in% 200:300) {
-  rev(c(0, 20, 50, 90, 150, max_lists))
-} else if (max_lists %in% 300:500) {
-  rev(c(0, 30, 80, 150, 250, max_lists))
-} else if (max_lists %in% 500:1000) {
-  rev(c(0, 30, 100, 200, 400, max_lists))
-} else if (max_lists %in% 1000:2000) {
-  rev(c(0, 10, 50, 100, 250, 1000, max_lists))
-} else if (max_lists %in% 2000:4000) {
-  rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
-} else if (max_lists %in% 4000:8000) {
-  rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
-} else if (max_lists > 8000) {
-  rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
-} 
-
-
-# simplifying the spatial features
-cur_states_sf <- cur_states_sf %>% ms_simplify(keep = 0.05, keep_shapes = FALSE)
-
-mapviewOptions(fgb = FALSE)
-map_effort <- ( # state outlines
-  mapView(cur_states_sf, 
-          map.types = c("Esri.WorldImagery"), 
-          popup = FALSE, highlight = FALSE, legend = FALSE, 
-          label = NA, alpha.regions = 0)) +
-  (mapView(campus_stats, 
-           zcol = c("Total checklists"), 
-           map.types = c("Esri.WorldImagery"),
-           layer.name = c("Checklists per campus"), 
-           popup = leafpop::popupTable(campus_stats,
-                                       zcol = c("Campus", "Total checklists", "Unique checklists",
-                                                "Participants", "Species", "Most common"), 
-                                       feature.id = FALSE,
-                                       row.numbers = FALSE),
-           at = break_at))
-
-# webshot::install_phantomjs()
-mapshot(map_effort, 
-        url = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.html"))
+if (cur_event$SHORT.CODE == "GBBC"){
+  
+  # plot campus-wise stats on map
+  
+  # most common species
+  mostcom <- data_campus %>% 
+    group_by(COMMON.NAME, GROUP.ID) %>% 
+    slice(1) %>% 
+    group_by(CAMPUS) %>% 
+    mutate(LISTS.C = n_distinct(GROUP.ID)) %>% 
+    group_by(CAMPUS, COMMON.NAME) %>% 
+    summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.C)) %>% 
+    arrange(desc(REP.FREQ)) %>% 
+    slice(1) %>% 
+    distinct(CAMPUS, COMMON.NAME) %>% 
+    rename(MOST.COM = COMMON.NAME)
+  
+  campus_stats <- data_campus %>% 
+    group_by(CAMPUS) %>% 
+    basic_stats(pipeline = T, prettify = F) %>% 
+    # function retains grouping
+    ungroup() %>% 
+    # keeping only necessary
+    dplyr::select(CAMPUS, SPECIES, LISTS.ALL, LISTS.U, PARTICIPANTS) %>% 
+    complete(CAMPUS = unique(data_campus$CAMPUS), 
+             fill = list(SPECIES = 0,
+                         LISTS.ALL = 0,
+                         LISTS.U = 0,
+                         PARTICIPANTS = 0)) %>% 
+    left_join(mostcom) %>% 
+    arrange(desc(LISTS.ALL))
+  
+  write.csv(campus_stats, row.names = FALSE, 
+            file = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.csv"))
+  
+  
+  campus_sf <- data_campus %>% 
+    distinct(CAMPUS, LONGITUDE, LATITUDE) %>% 
+    st_as_sf(coords = c("LONGITUDE", "LATITUDE"))
+  
+  campus_stats <- campus_stats %>% 
+    # renaming for map
+    rename(Campus = CAMPUS,
+           Species = SPECIES,
+           `Total checklists` = LISTS.ALL,
+           `Unique checklists` = LISTS.U,
+           Participants = PARTICIPANTS,
+           `Most common` = MOST.COM) %>% 
+    right_join(campus_sf, by = c("Campus" = "CAMPUS")) %>% 
+    st_as_sf()
+  
+  
+  # different breakpoints in visualisation
+  max_lists <- max(na.omit(campus_stats$`Total checklists`))
+  break_at <- if (max_lists %in% 200:300) {
+    rev(c(0, 20, 50, 90, 150, max_lists))
+  } else if (max_lists %in% 300:500) {
+    rev(c(0, 30, 80, 150, 250, max_lists))
+  } else if (max_lists %in% 500:1000) {
+    rev(c(0, 30, 100, 200, 400, max_lists))
+  } else if (max_lists %in% 1000:2000) {
+    rev(c(0, 10, 50, 100, 250, 1000, max_lists))
+  } else if (max_lists %in% 2000:4000) {
+    rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
+  } else if (max_lists %in% 4000:8000) {
+    rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
+  } else if (max_lists > 8000) {
+    rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
+  } 
+  
+  
+  # simplifying the spatial features
+  cur_states_sf <- cur_states_sf %>% ms_simplify(keep = 0.05, keep_shapes = FALSE)
+  
+  mapviewOptions(fgb = FALSE)
+  map_effort <- ( # state outlines
+    mapView(cur_states_sf, 
+            map.types = c("Esri.WorldImagery"), 
+            popup = FALSE, highlight = FALSE, legend = FALSE, 
+            label = NA, alpha.regions = 0)) +
+    (mapView(campus_stats, 
+             zcol = c("Total checklists"), 
+             map.types = c("Esri.WorldImagery"),
+             layer.name = c("Checklists per campus"), 
+             popup = leafpop::popupTable(campus_stats,
+                                         zcol = c("Campus", "Total checklists", "Unique checklists",
+                                                  "Participants", "Species", "Most common"), 
+                                         feature.id = FALSE,
+                                         row.numbers = FALSE),
+             at = break_at))
+  
+  # webshot::install_phantomjs()
+  mapshot(map_effort, 
+          url = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.html"))
+  
+}
