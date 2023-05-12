@@ -22,12 +22,12 @@ source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/mapp
 
 if (cur_event$SHORT.CODE == "HBC"){
   
-  bhu_zippath <-  glue("../ebird-datasets/EBD/ebd_BT_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_rel{rel_month_lab}-{rel_year}.zip")
-  nep_zippath <-  glue("../ebird-datasets/EBD/ebd_NP_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_rel{rel_month_lab}-{rel_year}.zip")
-  bhu_rawfile <-  glue("ebd_BT_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_rel{rel_month_lab}-{rel_year}.txt")
-  nep_rawfile <-  glue("ebd_NP_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_{rel_year}{str_pad(rel_month_num, width=2, pad='0')}_rel{rel_month_lab}-{rel_year}.txt")
-  bhu_rawpath <-  glue("../ebird-datasets/EBD/{bhu_rawfile}.txt")
-  nep_rawpath <-  glue("../ebird-datasets/EBD/{nep_rawfile}.txt")
+  bhu_zippath <-  glue("../ebird-datasets/EBD/ebd_BT_rel{rel_month_lab}-{rel_year}.zip")
+  nep_zippath <-  glue("../ebird-datasets/EBD/ebd_NP_rel{rel_month_lab}-{rel_year}.zip")
+  bhu_rawfile <-  glue("ebd_BT_rel{rel_month_lab}-{rel_year}.txt")
+  nep_rawfile <-  glue("ebd_NP_rel{rel_month_lab}-{rel_year}.txt")
+  bhu_rawpath <-  glue("../ebird-datasets/EBD/{bhu_rawfile}")
+  nep_rawpath <-  glue("../ebird-datasets/EBD/{nep_rawfile}")
   
   preimp <- c("CATEGORY","EXOTIC.CODE","COMMON.NAME","OBSERVATION.COUNT",
               "LOCALITY.ID","LOCALITY.TYPE","REVIEWED","APPROVED","LAST.EDITED.DATE",
@@ -43,7 +43,7 @@ if (cur_event$SHORT.CODE == "HBC"){
   if (!file.exists(bhu_rawpath) & file.exists(bhu_zippath)) {
     unzip(zipfile = bhu_zippath, files = bhu_rawfile, exdir = "../ebird-datasets/EBD") # don't add trailing slash in path
     print("Bhutan data download unzipped.")
-  } else if (!file.exists(rawpath) & !file.exists(zippath)) {
+  } else if (!file.exists(bhu_rawpath) & !file.exists(bhu_zippath)) {
     print("Latest Bhutan data download does not exist!")
   } else {
     print("Bhutan data download already unzipped.")
@@ -52,7 +52,7 @@ if (cur_event$SHORT.CODE == "HBC"){
   if (!file.exists(nep_rawpath) & file.exists(nep_zippath)) {
     unzip(zipfile = nep_zippath, files = nep_rawfile, exdir = "../ebird-datasets/EBD") # don't add trailing slash in path
     print("Nepal data download unzipped.")
-  } else if (!file.exists(rawpath) & !file.exists(zippath)) {
+  } else if (!file.exists(nep_rawpath) & !file.exists(nep_zippath)) {
     print("Latest Nepal data download does not exist!")
   } else {
     print("Nepal data download already unzipped.")
@@ -68,7 +68,7 @@ if (cur_event$SHORT.CODE == "HBC"){
   
   data_BT <- read.delim(bhu_rawpath, colClasses = nms, sep = "\t", header = T, quote = "",
                         stringsAsFactors = F, na.strings = c(""," ",NA)) %>% 
-    mutate(COUNTRY == "Bhutan") %>% 
+    mutate(COUNTRY = "Bhutan") %>% 
     mutate(BREEDING.CODE = str_trim(BREEDING.CODE)) %>% 
     # group ID and dates
     mutate(GROUP.ID = ifelse(is.na(GROUP.IDENTIFIER), SAMPLING.EVENT.IDENTIFIER, GROUP.IDENTIFIER), 
@@ -84,7 +84,7 @@ if (cur_event$SHORT.CODE == "HBC"){
   
   data_NP <- read.delim(nep_rawpath, colClasses = nms, sep = "\t", header = T, quote = "",
                         stringsAsFactors = F, na.strings = c(""," ",NA)) %>% 
-    mutate(COUNTRY == "Nepal") %>% 
+    mutate(COUNTRY = "Nepal") %>% 
     mutate(BREEDING.CODE = str_trim(BREEDING.CODE)) %>% 
     # group ID and dates
     mutate(GROUP.ID = ifelse(is.na(GROUP.IDENTIFIER), SAMPLING.EVENT.IDENTIFIER, GROUP.IDENTIFIER), 
@@ -108,114 +108,123 @@ if (cur_event$SHORT.CODE == "HBC"){
 # preparing data ----------------------------------------------------------
 
 # filtering for loc & dates
+
+data0 <- data %>% 
+  # filter(OBSERVATION.DATE %in% rel_date) 
+  filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE, 
+                                   by = "days"))
+
+# previous years' data
+sched_event <- sched0 %>% filter(SHORT.CODE == cur_event$SHORT.CODE)
+
+data_all <- data %>% 
+  filter(YEAR %in% sched_event$EDITION) %>% 
+  group_by(YEAR) %>% 
+  left_join(sched_event %>% 
+              dplyr::select(EDITION, START.DATE, END.DATE), 
+            by = c("YEAR" = "EDITION")) %>% 
+  filter(OBSERVATION.DATE >= START.DATE & OBSERVATION.DATE <= END.DATE) %>% 
+  # filter(OBSERVATION.DATE == rel_date) %>% 
+  ungroup() %>% 
+  mutate(START.DATE = NULL, END.DATE = NULL)
+
+
 if (cur_event$SHORT.CODE == "HBC"){
   
   bt_np <- bind_rows(data_BT, data_NP) %>% 
+    filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE,
+                                     by = "days")) %>%
+    # filter(OBSERVATION.DATE %in% rel_date) %>% 
     join_BT_NP_sf()
+  
+  bt_np_all <- bind_rows(data_BT, data_NP) %>% 
+    filter(YEAR %in% sched_event$EDITION) %>% 
+    group_by(YEAR) %>% 
+    left_join(sched_event %>% 
+                dplyr::select(EDITION, START.DATE, END.DATE), 
+              by = c("YEAR" = "EDITION")) %>% 
+    filter(OBSERVATION.DATE >= START.DATE & OBSERVATION.DATE <= END.DATE) %>% 
+    ungroup() %>% 
+    mutate(START.DATE = NULL, END.DATE = NULL)
 
   
-  data0 <- data %>% 
-    filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE, 
-                                     by = "days")) %>% 
-    mutate(COUNTRY = "India") 
+  data0 <- data0 %>% mutate(COUNTRY = "India") 
+  data_all <- data_all %>% mutate(COUNTRY = "India") 
+  
   
   # Joining mapvars to data
   sf_use_s2(FALSE)
   data0 <- join_map_sf(data0)
+  data_all <- join_map_sf(data_all)
   
   
-  # combining all countries
-  data0 <- data0 %>% bind_rows(bt_np)
-
-  
-  # filtering for EBD and HBC separately 
-  cur_dists_sf_EBD <- dists_sf
-  cur_states_sf_EBD <- states_sf
-  
-  data0_EBD <- data0 %>% filter(COUNTRY == "India")
-  
-  
-  cur_dists_sf_HBC <- dists_sf %>%
+  cur_dists_sf <- dists_sf %>%
+    dplyr::select(-AREA) %>% 
     filter(DISTRICT.NAME %in% c("Darjeeling","Kalimpong","Alipurduar","Hoshiarpur","Rupnagar",
                                 "Pilibhit","Lakhimpur Kheri","Kokrajhar","Chirang","Baksa",
                                 "Sonitpur","Dhemaji","Lakhimpur","Panchkula","Udalguri","Biswanath",
                                 "Kheri","Pathankot","Una","Sahibzada Ajit Singh Nagar","Saharanpur",
                                 "Yamunanagar","Bahraich","Shrawasti","Balrampur","Pashchim Champaran",
-                                "Purba Champaran")) %>% 
+                                "Purba Champaran") |
+             STATE.NAME %in% c("Ladakh","Jammu and Kashmir","Himachal Pradesh","Uttarakhand",
+                               "Sikkim","Arunachal Pradesh")) %>% 
+    # retain Hamirpur in HP and remove the one in UP
+    filter((STATE.NAME != "Uttar Pradesh" | DISTRICT.NAME != "Hamirpur") &
+             # remove CT completely because Bilaspur is found in CT as well as HP
+             (STATE.NAME != "Chhattisgarh")) %>% 
+    mutate(COUNTRY = "India") %>% 
     bind_rows(bt_dists_sf, np_dists_sf)
-  cur_states_sf_HBC <- states_sf %>%
-    filter(STATE.NAME %in% c("Ladakh","Jammu and Kashmir","Himachal Pradesh","Uttarakhand",
-                             "Sikkim","Arunachal Pradesh","Bhutan","Nepal")) %>% 
+  
+  cur_states_sf <- states_sf %>%
+    dplyr::select(-AREA) %>% 
+    filter(STATE.NAME %in% cur_dists_sf$STATE.NAME) %>% 
+    mutate(COUNTRY = "India") %>% 
     bind_rows(bt_states_sf, np_states_sf)
   
-  data0_HBC <- data0 %>%
-    filter(STATE.NAME %in% cur_states_sf_HBC$STATE.NAME | 
-             DISTRICT.NAME %in% cur_dists_sf_HBC$DISTRICT.NAME & 
+  
+  # combining all countries
+  data0 <- data0 %>% 
+    bind_rows(bt_np) %>%
+    filter((STATE.NAME %in% cur_states_sf$STATE.NAME | 
+             DISTRICT.NAME %in% cur_dists_sf$DISTRICT.NAME) & 
+             # retain Hamirpur in HP and remove the one in UP
              (STATE.NAME != "Uttar Pradesh" | DISTRICT.NAME != "Hamirpur") &
+             # remove CT completely because Bilaspur is found in CT as well as HP
+             (STATE.NAME != "Chhattisgarh"))
+  
+  data_all <- data_all %>% 
+    bind_rows(bt_np_all) %>%
+    filter((STATE.NAME %in% cur_states_sf$STATE.NAME | 
+              DISTRICT.NAME %in% cur_dists_sf$DISTRICT.NAME) & 
+             # retain Hamirpur in HP and remove the one in UP
+             (STATE.NAME != "Uttar Pradesh" | DISTRICT.NAME != "Hamirpur") &
+             # remove CT completely because Bilaspur is found in CT as well as HP
              (STATE.NAME != "Chhattisgarh"))
   
   
-  regions_EBD <- cur_states_sf_EBD %>% 
-    st_drop_geometry() %>% 
-    dplyr::select(STATE.NAME) %>% 
-    mutate(REGION1 = case_when(STATE.NAME %in% c("Punjab", "Haryana", "Uttar Pradesh", 
-                                                 "Delhi", "Bihar", "Chandigarh")
-                               ~ "North",
-                               STATE.NAME %in% c("Gujarat","Rajasthan",
-                                                 "Dadra and Nagar Haveli","Daman and Diu")
-                               ~ "West",
-                               STATE.NAME %in% c("Jammu and Kashmir", "Ladakh", 
-                                                 "Uttarakhand", "Himachal Pradesh")
-                               ~ "Himalaya",
-                               STATE.NAME %in% c("Madhya Pradesh", "Chhattisgarh", 
-                                                 "Maharashtra", "Jharkhand", "Odisha")
-                               ~ "Central",
-                               STATE.NAME %in% c("Andhra Pradesh", "Telangana", "Karnataka",
-                                                 "Kerala", "Tamil Nadu", "Goa", "Puducherry")
-                               ~ "South",
-                               STATE.NAME %in% c("Arunachal Pradesh", "Nagaland", "Manipur",
-                                                 "Tripura", "Mizoram", "Sikkim", 
-                                                 "West Bengal", "Assam", "Meghalaya")
-                               ~ "East",
-                               STATE.NAME %in% c("Andaman and Nicobar Islands", 
-                                                 "Lakshadweep")
-                               ~ "A&N")) %>% 
-    mutate(REGION1 = factor(REGION1, 
-                            levels = c("A&N", "Central", "East", "Himalaya", 
-                                       "North", "South", "West")))
   
-  no_regions_EBD <- n_distinct(regions_EBD$REGION1)
-  
-  regions_HBC <- cur_states_sf_HBC %>% 
+  regions <- cur_dists_sf %>% 
     st_drop_geometry() %>% 
-    dplyr::select(STATE.NAME) %>% 
+    dplyr::select(DISTRICT.NAME, STATE.NAME, COUNTRY) %>% 
     mutate(REGION1 = case_when(STATE.NAME %in% c("Jammu and Kashmir", "Ladakh", 
                                                  "Himachal Pradesh", "Punjab", "Haryana")
                                ~ "Western Region",
-                               STATE.NAME %in% c("Uttarakhand", "Uttar Pradesh", 
-                                                 "Nepal", "Bihar")
+                               STATE.NAME %in% c("Uttarakhand", "Uttar Pradesh", "Bihar") |
+                                 COUNTRY == "Nepal"
                                ~ "Central Region",
                                STATE.NAME %in% c("Arunachal Pradesh", "Sikkim",
-                                                 "West Bengal", "Assam", "Bhutan")
+                                                 "West Bengal", "Assam") |
+                                 COUNTRY == "Bhutan"
                                ~ "Eastern Region")) %>% 
     mutate(REGION1 = factor(REGION1, 
                             levels = c("Western Region", "Central Region", "Eastern Region")))
   
-  no_regions_HBC <- n_distinct(regions_HBC$REGION1)
+  no_regions <- n_distinct(regions$REGION1)
   
 } 
 
-# sf for regions
-regions_sf_EBD <- regions_EBD %>% 
-  left_join(cur_states_sf_EBD %>% dplyr::select(-AREA)) %>% 
-  st_as_sf() %>%
-  st_make_valid() %>% # otherwise below results in TopologyException error
-  # joins multiple polygons into one for each region
-  group_by(REGION1) %>% 
-  dplyr::summarise()
-
-regions_sf_HBC <- regions_HBC %>% 
-  left_join(cur_states_sf_HBC %>% dplyr::select(-AREA)) %>% 
+regions_sf <- regions %>% 
+  left_join(cur_dists_sf %>% dplyr::select(-COUNTRY), by = c("STATE.NAME", "DISTRICT.NAME")) %>% 
   st_as_sf() %>%
   st_make_valid() %>% # otherwise below results in TopologyException error
   # joins multiple polygons into one for each region
@@ -223,29 +232,20 @@ regions_sf_HBC <- regions_HBC %>%
   dplyr::summarise()
 
 # adding regions to data
-data0_EBD <- data0_EBD %>% left_join(regions_EBD)
-data0_HBC <- data0_HBC %>% left_join(regions_HBC)
+data0 <- data0 %>% left_join(regions)
+data_all <- data_all %>% left_join(regions)
 
 
 # create and write a file with common and scientific names of all species
 # useful for mapping
-temp_EBD <- data0_EBD %>%
+temp <- data0 %>%
   filter(CATEGORY == "species" | CATEGORY == "issf") %>%
   filter(!EXOTIC.CODE %in% c("X")) %>%
   distinct(COMMON.NAME)
 
-write.csv(temp_EBD, row.names = FALSE, 
-          file = glue("{cur_outpath}{cur_event$FULL.CODE}_speclist_EBD.csv"))
-rm(temp_EBD)
-
-temp_HBC <- data0_HBC %>%
-  filter(CATEGORY == "species" | CATEGORY == "issf") %>%
-  filter(!EXOTIC.CODE %in% c("X")) %>%
-  distinct(COMMON.NAME)
-
-write.csv(temp_HBC, row.names = FALSE, 
-          file = glue("{cur_outpath}{cur_event$FULL.CODE}_speclist_HBC.csv"))
-rm(temp_HBC)
+write.csv(temp, row.names = FALSE, 
+          file = glue("{cur_outpath}{cur_event$FULL.CODE}_speclist.csv"))
+rm(temp)
 
 
 # stats -----------------------------------------------------------
@@ -332,6 +332,25 @@ state_day_sum <- data0 %>%
   arrange(STATE.NAME, DAY.M)
 
 
+overall_com_spec <- data0 %>%
+  filter(ALL.SPECIES.REPORTED == 1) %>%
+  # taking only districts with sufficient (10) lists to calculate REPFREQ
+  group_by(STATE.NAME) %>% 
+  mutate(LISTS.ST = n_distinct(GROUP.ID)) %>% 
+  ungroup() %>%
+  filter(LISTS.ST > 10) %>%
+  # repfreq
+  group_by(COMMON.NAME, STATE.NAME) %>% 
+  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.ST)) %>% 
+  # averaging repfreq across states
+  ungroup() %>% 
+  mutate(NO.STATES = n_distinct(STATE.NAME)) %>% 
+  group_by(COMMON.NAME) %>% 
+  summarise(REP.FREQ = sum(REP.FREQ)/max(NO.STATES)) %>% 
+  ungroup() %>% 
+  # top 5 per region
+  arrange(desc(REP.FREQ))
+
 write_xlsx(x = list("Overall stats" = overall_stats, 
                     "Top 30 checklist uploaders" = top30, 
                     "Top birders per state" = top_state,
@@ -339,7 +358,8 @@ write_xlsx(x = list("Overall stats" = overall_stats,
                     "Summary per district" = dist_sum,
                     "Summary per state" = state_sum,
                     "Summary per day" = day_sum,
-                    "Summary per state-day" = state_day_sum),
+                    "Summary per state-day" = state_day_sum,
+                    "Overall common species" = overall_com_spec),
            path = glue("{cur_outpath}{cur_event$FULL.CODE}_stats.xlsx"))
 
 
@@ -397,7 +417,7 @@ dist_stats <- data0 %>%
                        LOCATIONS = 0)) %>% 
   magrittr::set_colnames(c("District", "Species", "Total checklists", "Participants",
                            "Locations")) %>% 
-  right_join(cur_dists_sf %>% dplyr::select(-AREA),
+  right_join(cur_dists_sf,
              by = c("District" = "DISTRICT.NAME")) %>% 
   st_as_sf()
 
@@ -450,9 +470,11 @@ state_stats <- data0 %>%
                        LISTS.ALL = 0,
                        PARTICIPANTS = 0,
                        LOCATIONS = 0)) %>% 
+  # we only want to plot full states
+  filter(!STATE.NAME %in% c("Punjab", "Haryana", "West Bengal", "Assam", "Uttar Pradesh", "Bihar")) %>% 
   magrittr::set_colnames(c("State", "Species", "Total checklists", "Participants",
                            "Locations")) %>% 
-  right_join(cur_states_sf %>% dplyr::select(-AREA),
+  left_join(cur_states_sf,
              by = c("State" = "STATE.NAME")) %>% 
   st_as_sf()
 
@@ -514,7 +536,7 @@ palette_vals <- palette[1:no_regions]
 
 region_map <- regions_sf %>% 
   ggplot() +
-  geom_sf(aes(fill = REGION1, geometry = STATE.GEOM), colour = NA) +
+  geom_sf(aes(fill = REGION1, geometry = DISTRICT.GEOM), colour = NA) +
   # scale_x_continuous(expand = c(0,0)) +
   # scale_y_continuous(expand = c(0,0)) +
   theme(axis.line = element_blank(),
@@ -683,93 +705,13 @@ plot5 <- ggplot(yearly_com_spec, aes(x = YEAR, y = REP.FREQ, col = COMMON.NAME))
                       values = palette) 
 
 
-# Campus Bird Count -------------------------------------------------------
-
-# plot campus-wise stats on map
-
-# most common species
-mostcom <- data_campus %>% 
-  group_by(COMMON.NAME, GROUP.ID) %>% 
-  slice(1) %>% 
-  group_by(CAMPUS) %>% 
-  mutate(LISTS.C = n_distinct(GROUP.ID)) %>% 
-  group_by(CAMPUS, COMMON.NAME) %>% 
-  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.C)) %>% 
-  arrange(desc(REP.FREQ)) %>% 
-  slice(1) %>% 
-  distinct(CAMPUS, COMMON.NAME) %>% 
-  rename(MOST.COM = COMMON.NAME)
-
-campus_stats <- data_campus %>% 
-  group_by(CAMPUS) %>% 
-  basic_stats(pipeline = T, prettify = F) %>% 
-  # function retains grouping
-  ungroup() %>% 
-  # keeping only necessary
-  dplyr::select(CAMPUS, SPECIES, LISTS.ALL, LISTS.U, PARTICIPANTS) %>% 
-  complete(CAMPUS = unique(data_campus$CAMPUS), 
-           fill = list(SPECIES = 0,
-                       LISTS.ALL = 0,
-                       LISTS.U = 0,
-                       PARTICIPANTS = 0)) %>% 
-  left_join(mostcom) %>% 
-  arrange(desc(LISTS.ALL))
-
-write.csv(campus_stats, row.names = FALSE, 
-          file = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.csv"))
 
 
-campus_sf <- data_campus %>% 
-  distinct(CAMPUS, LONGITUDE, LATITUDE) %>% 
-  st_as_sf(coords = c("LONGITUDE", "LATITUDE"))
-
-campus_stats <- campus_stats %>% 
-  # renaming for map
-  rename(Campus = CAMPUS,
-         Species = SPECIES,
-         `Total checklists` = LISTS.ALL,
-         `Unique checklists` = LISTS.U,
-         Participants = PARTICIPANTS,
-         `Most common` = MOST.COM) %>% 
-  right_join(campus_sf, by = c("Campus" = "CAMPUS")) %>% 
-  st_as_sf()
-
-
-# different breakpoints in visualisation
-max_lists <- max(na.omit(campus_stats$`Total checklists`))
-break_at <- if (max_lists %in% 200:300) {
-  rev(c(0, 20, 50, 90, 150, max_lists))
-} else if (max_lists %in% 300:500) {
-  rev(c(0, 30, 80, 150, 250, max_lists))
-} else if (max_lists %in% 500:1000) {
-  rev(c(0, 30, 100, 200, 400, max_lists))
-} else if (max_lists %in% 1000:2000) {
-  rev(c(0, 10, 50, 100, 250, 1000, max_lists))
-} else if (max_lists %in% 2000:4000) {
-  rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
-} else if (max_lists %in% 4000:8000) {
-  rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
-} else if (max_lists > 8000) {
-  rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
-} 
-
-mapviewOptions(fgb = FALSE)
-map_effort <- ( # state outlines
-  mapView(cur_states_sf, 
-          map.types = c("Esri.WorldImagery"), 
-          popup = FALSE, highlight = FALSE, legend = FALSE, 
-          label = NA, alpha.regions = 0)) +
-  (mapView(campus_stats, 
-           zcol = c("Total checklists"), 
-           map.types = c("Esri.WorldImagery"),
-           layer.name = c("Checklists per campus"), 
-           popup = leafpop::popupTable(campus_stats,
-                                       zcol = c("Campus", "Total checklists", "Unique checklists",
-                                                "Participants", "Species", "Most common"), 
-                                       feature.id = FALSE,
-                                       row.numbers = FALSE),
-           at = break_at))
-
-# webshot::install_phantomjs()
-mapshot(map_effort, 
-        url = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC.html"))
+# unknown -----------------------------------------------------------------
+# 
+# ## subset Nepal data for their app
+# 
+# nep = data %>% filter(ST_NM == "NEPAL")
+# nep1 = nep[,-c(2,4,10,11,25,26,27,28,30,33,34,35,36,37)]
+# names(nep1)[22:23] = c("day","year")
+# write.csv(nep1,"nepal_data.csv", row.names = F)
