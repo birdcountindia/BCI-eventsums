@@ -10,7 +10,8 @@ require(sf)
 
 # preparing data ----------------------------------------------------------
 
-load("data/maps_sf.RData")
+# latest maps from https://github.com/birdcountindia/india-maps
+load(url("https://github.com/birdcountindia/india-maps/raw/main/outputs/maps_sf.RData"))
 load(maindatapath)
 
 
