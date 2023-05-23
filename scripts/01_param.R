@@ -2,12 +2,10 @@ require(lubridate)
 require(tidyverse)
 require(glue)
 
-
-
-userspath <- "../ebird-datasets/EBD/ebd_users_relFeb-2023.txt" # update when latest available
-
-
 # automated parameters ----------------------------------------------------
+
+# paths to latest versions of user & GA info, and sensitive species data
+load(url("https://github.com/birdcountindia/ebird-datasets/raw/main/EBD/latest_non-EBD_paths.RData"))
 
 # date under consideration for current leaderboard
 cur_date <- if (today() %>% day() <= 16) { 
@@ -35,9 +33,6 @@ rel_month_num <- rel_date %>% month()
 rel_month_lab <- rel_date %>% month(label = T, abbr = T)
 # rel_month_num <- (rel_date - months(1)) %>% month()
 # rel_month_lab <- (rel_date - months(1)) %>% month(label = T, abbr = T) 
-
-latestusersrel <- str_extract(userspath, "(?<=rel)[^.]*(?=.|$)")
-groupaccspath <- glue("../ebird-datasets/group-accounts/ebd_users_GA_rel{latestusersrel}.csv")
 
 
 maindatapath <-  glue("../ebird-datasets/EBD/ebd_IN_rel{rel_month_lab}-{rel_year}.RData")
