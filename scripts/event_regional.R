@@ -127,6 +127,44 @@ if (cur_event$SHORT.CODE == "BiBC"){
   
   no_regions <- n_distinct(regions$REGION1)
   
+} else if (cur_event$SHORT.CODE == "PBBC"){
+  
+  data0 <- data %>% 
+    filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE, 
+                                     by = "days")) %>% 
+    filter(STATE.CODE == "IN-WB")
+  
+  # Joining mapvars to data
+  sf_use_s2(FALSE)
+  data0 <- join_map_sf(data0)
+  
+  
+  cur_dists_sf <- dists_sf %>% filter(STATE.NAME == "West Bengal")
+  cur_states_sf <- states_sf %>% filter(STATE.NAME == "West Bengal")
+  
+  
+  regions <- cur_dists_sf %>% 
+    st_drop_geometry() %>% 
+    dplyr::select(DISTRICT.NAME) %>% 
+    mutate(REGION1 = case_when(DISTRICT.NAME %in% c("Purulia","Paschim Bardhaman","Birbhum",
+                                                    "Purba Bardhaman","Bankura",
+                                                    "Jhargram")
+                               ~ "West",
+                               DISTRICT.NAME %in% c("Nadia","Murshidabad",
+                                                    "Malda","Dakshin Dinajpur",
+                                                    "Uttar Dinajpur")
+                               ~ "Central",
+                               DISTRICT.NAME %in% c("Medinipur West","Purba Medinipur",
+                                                    "Howrah","South 24 Parganas",
+                                                    "Kolkata","Hooghly","North 24 Parganas")
+                               ~ "South",
+                               DISTRICT.NAME %in% c("Darjeeling","Kalimpong","Jalpaiguri",
+                                                    "Alipurduar","Cooch Behar")
+                               ~ "North")) %>% 
+    mutate(REGION1 = factor(REGION1, levels = c("North", "Central", "West", "South")))
+  
+  no_regions <- n_distinct(regions$REGION1)
+  
 }
 
 # sf for regions
@@ -208,12 +246,33 @@ dist_day_sum <- data0 %>%
   arrange(DISTRICT.NAME, DAY.M)
 
 
+overall_com_spec <- data0 %>%
+  filter(ALL.SPECIES.REPORTED == 1) %>%
+  # taking only districts with sufficient (10) lists to calculate REPFREQ
+  group_by(STATE.NAME) %>% 
+  mutate(LISTS.ST = n_distinct(GROUP.ID)) %>% 
+  ungroup() %>%
+  filter(LISTS.ST > 10) %>%
+  # repfreq
+  group_by(COMMON.NAME, STATE.NAME) %>% 
+  summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.ST)) %>% 
+  # averaging repfreq across states
+  ungroup() %>% 
+  mutate(NO.STATES = n_distinct(STATE.NAME)) %>% 
+  group_by(COMMON.NAME) %>% 
+  summarise(REP.FREQ = sum(REP.FREQ)/max(NO.STATES)) %>% 
+  ungroup() %>% 
+  # top 5 per region
+  arrange(desc(REP.FREQ))
+
+
 write_xlsx(x = list("Overall stats" = overall_stats, 
                     "Top 10 checklist uploaders" = top10, 
                     "Birders per district" = birder_dist,
                     "Summary per district" = dist_sum,
                     "Summary per day" = day_sum,
-                    "Summary per district-day" = dist_day_sum),
+                    "Summary per district-day" = dist_day_sum,
+                    "Overall common species" = overall_com_spec),
            path = glue("{cur_outpath}{cur_event$FULL.CODE}_stats.xlsx"))
 
 
