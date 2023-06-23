@@ -340,16 +340,20 @@ dist_stats <- data0 %>%
 # different breakpoints in visualisation
 
 max_lists <- max(na.omit(dist_stats$`Total checklists`))
-break_at <- if (max_lists %in% 500:1000) {
-  rev(c(0, 30, 100, 200, 400, max_lists))
+break_at <- break_at <- if (max_lists %in% 0:200) {
+  rev(c(0, 1, 10, 40, 100, max_lists))
+} else if (max_lists %in% 200:500) {
+  rev(c(0, 1, 20, 50, 150, max_lists))
+} else if (max_lists %in% 500:1000) {
+  rev(c(0, 1, 30, 100, 200, 400, max_lists))
 } else if (max_lists %in% 1000:2000) {
-  rev(c(0, 10, 50, 100, 250, 1000, max_lists))
+  rev(c(0, 1, 10, 50, 100, 250, 1000, max_lists))
 } else if (max_lists %in% 2000:4000) {
-  rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
+  rev(c(0, 1, 30, 80, 200, 500, 1000, 2000, max_lists))
 } else if (max_lists %in% 4000:8000) {
-  rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
+  rev(c(0, 1, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
 } else if (max_lists > 8000) {
-  rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
+  rev(c(0, 1, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
 
 
@@ -400,16 +404,20 @@ state_stats <- data0 %>%
 # different breakpoints in visualisation
 
 max_lists <- max(na.omit(state_stats$`Total checklists`))
-break_at <- if (max_lists %in% 500:1000) {
-  rev(c(0, 30, 100, 200, 400, max_lists))
+break_at <- break_at <- if (max_lists %in% 0:200) {
+  rev(c(0, 1, 10, 40, 100, max_lists))
+} else if (max_lists %in% 200:500) {
+  rev(c(0, 1, 20, 50, 150, max_lists))
+} else if (max_lists %in% 500:1000) {
+  rev(c(0, 1, 30, 100, 200, 400, max_lists))
 } else if (max_lists %in% 1000:2000) {
-  rev(c(0, 10, 50, 100, 250, 1000, max_lists))
+  rev(c(0, 1, 10, 50, 100, 250, 1000, max_lists))
 } else if (max_lists %in% 2000:4000) {
-  rev(c(0, 30, 80, 200, 500, 1000, 2000, max_lists))
+  rev(c(0, 1, 30, 80, 200, 500, 1000, 2000, max_lists))
 } else if (max_lists %in% 4000:8000) {
-  rev(c(0, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
+  rev(c(0, 1, 30, 100, 200, 500, 1000, 2000, 4000, max_lists))
 } else if (max_lists > 8000) {
-  rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
+  rev(c(0, 1, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
 
 
@@ -522,7 +530,7 @@ pos_dodge <- position_dodge(0.2)
 source("scripts/functions_plot.R")
 
 
-plot_breaks <- seq(0, 56000, 8000)
+plot_breaks <- gen_plot_breaks(data1$VALUES)
 plot1 <- ggplot(data1, aes(x = YEAR, y = VALUES, col = STAT)) +
   geom_point(size = 3) +
   geom_line(size = 1) +
@@ -533,10 +541,9 @@ plot1 <- ggplot(data1, aes(x = YEAR, y = VALUES, col = STAT)) +
   scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
-                     limits = c(min(plot_breaks), max(plot_breaks + 1000)))
+                     limits = c(min(plot_breaks), max(plot_breaks)))
 
-
-plot_breaks <- seq(0, 4000, 500)
+plot_breaks <- gen_plot_breaks(data2$VALUES)
 plot2 <- ggplot(data2, aes(x = YEAR, y = VALUES, col = STAT)) +
   geom_point(size = 3, position = pos_dodge) +
   geom_line(size = 1, position = pos_dodge) +
@@ -546,10 +553,11 @@ plot2 <- ggplot(data2, aes(x = YEAR, y = VALUES, col = STAT)) +
                       values = palette) +
   scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
-                     labels = scales::label_comma()(plot_breaks))
+                     labels = scales::label_comma()(plot_breaks),
+                     limits = c(min(plot_breaks), max(plot_breaks)))
 
 
-plot_breaks <- seq(600, 1100, 100)
+plot_breaks <- gen_plot_breaks(data3$VALUES)
 plot3 <- ggplot(data3, aes(x = YEAR, y = VALUES, col = STAT)) +
   geom_point(size = 3, position = pos_dodge) +
   geom_line(size = 1, position = pos_dodge) +
@@ -561,10 +569,10 @@ plot3 <- ggplot(data3, aes(x = YEAR, y = VALUES, col = STAT)) +
   scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
-                     limits = c(580, 1100))
+                     limits = c(min(plot_breaks), max(plot_breaks)))
 
 
-plot_breaks <- seq(100, 500, 50)
+plot_breaks <- gen_plot_breaks(data4$VALUES)
 plot4 <- ggplot(data4, aes(x = YEAR, y = VALUES, col = STAT)) +
   geom_point(size = 3, position = pos_dodge) +
   geom_line(size = 1, position = pos_dodge) +
@@ -574,8 +582,8 @@ plot4 <- ggplot(data4, aes(x = YEAR, y = VALUES, col = STAT)) +
                       values = palette) +
   scale_x_continuous(breaks = 2013:2023) +
   scale_y_continuous(breaks = plot_breaks, 
-                     # labels = scales::label_comma()(plot_breaks),
-                     limits = c(100, 500))
+                     labels = scales::label_comma()(plot_breaks),
+                     limits = c(min(plot_breaks), max(plot_breaks)))
 
 
 ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_overtime_effort.png"), 

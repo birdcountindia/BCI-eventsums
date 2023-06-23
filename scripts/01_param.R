@@ -6,6 +6,9 @@ require(glue)
 
 # paths to latest versions of user & GA info, and sensitive species data
 load(url("https://github.com/birdcountindia/ebird-datasets/raw/main/EBD/latest_non-EBD_paths.RData"))
+userspath <- glue("../ebird-datasets/{userspath}")
+senspath <- glue("../ebird-datasets/{senspath}")
+groupaccspath <- glue("../ebird-datasets/{groupaccspath}")
 
 # date under consideration for current leaderboard
 cur_date <- if (today() %>% day() <= 16) { 

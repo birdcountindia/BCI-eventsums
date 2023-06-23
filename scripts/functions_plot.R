@@ -1,4 +1,47 @@
 
+# to determine appropriate plot breaks ------------------------------------
+
+gen_plot_breaks <- function(values) {
+  
+  val_range <- ceiling(max(values) - min(values))
+  
+  if (val_range %in% 0:100) {
+    scale_by <- 20 # breaks should be by 100s
+    round_to <- -1 # rounding to Tens
+  } else if (val_range %in% 101:500) {
+    scale_by <- 100 # breaks should be by 100s
+    round_to <- -2 # rounding to Hundreds
+  } else if (val_range %in% 501:1000) {
+    scale_by <- 200 # breaks should be by 500s
+    round_to <- -2 # rounding to Hundreds
+  } else if (val_range %in% 1001:2000) {
+    scale_by <- 500 # breaks should be by 500s
+    round_to <- -2 # rounding to Hundreds
+  } else if (val_range %in% 2001:10000) {
+    scale_by <- 1000 # breaks should be by 1000s
+    round_to <- -3 # rounding to Thousands
+  } else {
+    scale_by <- min(values)*floor((max(values) %/% min(values))/5)
+    round_to <- -3
+  }
+  
+  pad_low <- round_to*(-2/3)
+  pad_high <- round_to*(-5/9)
+  
+  if (pad_low >= 1 & pad_high >= 1) {
+    val_low <- round(min(values)/pad_low, round_to)
+    val_high <- round(max(values)*pad_high, round_to)
+  } else {
+    val_low <- round(min(values) - 50, round_to)
+    val_high <- round(max(values) + 50, round_to)
+  }
+  
+  plot_breaks <- seq(val_low, val_high, by = scale_by)
+  
+  return(plot_breaks)
+  
+}
+
 # Is extrafont installed? -------------------------------------------------
 
 is.extrafont.installed <- function(){

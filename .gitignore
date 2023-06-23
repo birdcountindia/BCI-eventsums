@@ -9,6 +9,9 @@
 *.xlsx
 *.RData
 *.txt
+*.html
 
 outputs/*/*/*_files/
+# leaving only a couple of graphs just so directory is pushed
+outputs/*/*/*_overtime_*.png 
 outputs/GBBC/*/*.html
