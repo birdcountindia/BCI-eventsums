@@ -10,6 +10,8 @@ require(ggthemes)
 require(osmdata)
 
 
+cur_event_multiday <- (cur_event$END.DATE - cur_event$START.DATE) != 0
+
 # paths
 cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION}/")
 if (!dir.exists(cur_outpath)) (dir.create(cur_outpath, recursive = T))
@@ -253,85 +255,6 @@ rm(temp)
 # overall stats
 overall_stats <- basic_stats(data0)
 
-# top 30 checklist uploaders (eligible list filter)
-top30 <- data0 %>% 
-  filter(ALL.SPECIES.REPORTED == 1, DURATION.MINUTES >= 14) %>% 
-  group_by(OBSERVER.ID, FULL.NAME) %>% 
-  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER)) %>% 
-  ungroup() %>%
-  arrange(desc(NO.LISTS)) %>% 
-  slice(1:30)
-
-# top birders per state
-top_state <- data0 %>% 
-  filter(ALL.SPECIES.REPORTED == 1, DURATION.MINUTES >= 14) %>% 
-  filter(!is.na(STATE)) %>% 
-  group_by(STATE.NAME, OBSERVER.ID, FULL.NAME) %>% 
-  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER)) %>% 
-  ungroup() %>% 
-  complete(STATE.NAME = cur_states_sf$STATE.NAME, 
-           fill = list(NO.LISTS = 0)) %>% 
-  group_by(STATE.NAME) %>%
-  arrange(desc(NO.LISTS)) %>% 
-  slice(1) %>% 
-  ungroup() %>% 
-  arrange(desc(NO.LISTS)) 
-
-# list of birders per state
-birder_state <- data0 %>%
-  # some lists in eBird data have no state name
-  filter(!is.na(STATE)) %>% 
-  distinct(STATE.NAME, OBSERVER.ID) %>%
-  # joining names
-  left_join(eBird_users) %>% 
-  arrange(STATE.NAME)
-
-# district-wise summary
-dist_sum <- data0 %>%
-  # some lists in eBird data have no state name
-  filter(!is.na(STATE)) %>% 
-  group_by(DISTRICT.NAME) %>% 
-  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
-            NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
-  complete(DISTRICT.NAME = cur_dists_sf$DISTRICT.NAME, 
-           fill = list(NO.LISTS = 0,
-                       NO.BIRDERS = 0)) %>% 
-  arrange(desc(NO.LISTS))
-
-# state-wise summary
-state_sum <- data0 %>%
-  # some lists in eBird data have no state name
-  filter(!is.na(STATE)) %>% 
-  group_by(STATE.NAME) %>% 
-  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
-            NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
-  complete(STATE.NAME = cur_states_sf$STATE.NAME, 
-           fill = list(NO.LISTS = 0,
-                       NO.BIRDERS = 0)) %>% 
-  arrange(desc(NO.LISTS))
-
-# day-wise summary
-day_sum <- data0 %>%
-  group_by(DAY.M) %>% 
-  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
-            NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
-  arrange(desc(NO.LISTS))
-
-# state-day-wise summary
-state_day_sum <- data0 %>%
-  # some lists in eBird data have no state name
-  filter(!is.na(STATE)) %>% 
-  group_by(STATE.NAME, DAY.M) %>% 
-  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
-            NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
-  ungroup() %>% 
-  complete(STATE.NAME = cur_states_sf$STATE.NAME, 
-           DAY.M = seq(cur_event$START.DATE, cur_event$END.DATE, by = "days") %>% mday(),
-           fill = list(NO.LISTS = 0,
-                       NO.BIRDERS = 0)) %>% 
-  arrange(STATE.NAME, DAY.M)
-
-
 overall_com_spec <- data0 %>%
   filter(ALL.SPECIES.REPORTED == 1) %>%
   # taking only districts with sufficient (10) lists to calculate REPFREQ
@@ -351,16 +274,113 @@ overall_com_spec <- data0 %>%
   # top 5 per region
   arrange(desc(REP.FREQ))
 
-write_xlsx(x = list("Overall stats" = overall_stats, 
-                    "Top 30 checklist uploaders" = top30, 
-                    "Top birders per state" = top_state,
-                    "Birders per state" = birder_state,
-                    "Summary per district" = dist_sum,
-                    "Summary per state" = state_sum,
-                    "Summary per day" = day_sum,
-                    "Summary per state-day" = state_day_sum,
-                    "Overall common species" = overall_com_spec),
-           path = glue("{cur_outpath}{cur_event$FULL.CODE}_stats.xlsx"))
+# overall top 30 checklist uploaders (eligible list filter)
+top30 <- data0 %>% 
+  filter(ALL.SPECIES.REPORTED == 1, DURATION.MINUTES >= 14) %>% 
+  group_by(OBSERVER.ID, FULL.NAME) %>% 
+  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER)) %>% 
+  ungroup() %>%
+  arrange(desc(NO.LISTS)) %>% 
+  slice(1:30)
+
+# top birders per state
+top_state <- data0 %>% 
+  filter(ALL.SPECIES.REPORTED == 1, DURATION.MINUTES >= 14) %>% 
+  filter(!is.na(STATE)) %>% 
+  { if (cur_event$SHORT.CODE == "HBC") {
+    group_by(., COUNTRY, STATE.NAME, OBSERVER.ID, FULL.NAME) 
+  } else {
+    group_by(., REGION1, STATE.NAME, OBSERVER.ID, FULL.NAME) 
+  }} %>% 
+  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER)) %>% 
+  { if (cur_event$SHORT.CODE == "HBC") {
+    group_by(., COUNTRY, STATE.NAME) 
+  } else {
+    group_by(., REGION1, STATE.NAME) 
+  }} %>% 
+  arrange(desc(NO.LISTS)) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  arrange(desc(NO.LISTS)) 
+
+# state-wise summary
+state_sum <- data0 %>%
+  # some lists in eBird data have no state name
+  filter(!is.na(STATE)) %>% 
+  { if (cur_event$SHORT.CODE == "HBC") {
+    group_by(., COUNTRY, STATE.NAME) 
+  } else {
+    group_by(., REGION1, STATE.NAME) 
+  }} %>% 
+  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
+            NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
+  complete(STATE.NAME = cur_states_sf$STATE.NAME, 
+           fill = list(NO.LISTS = 0,
+                       NO.BIRDERS = 0)) %>% 
+  arrange(desc(NO.LISTS))
+
+
+# district-wise summary
+dist_sum <- data0 %>%
+  # some lists in eBird data have no state name
+  filter(!is.na(STATE)) %>% 
+  { if (cur_event$SHORT.CODE == "HBC") {
+    group_by(., COUNTRY, DISTRICT.NAME) 
+  } else {
+    group_by(., REGION1, DISTRICT.NAME) 
+  }} %>% 
+  summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
+            NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
+  complete(DISTRICT.NAME = cur_dists_sf$DISTRICT.NAME, 
+           fill = list(NO.LISTS = 0,
+                       NO.BIRDERS = 0)) %>% 
+  arrange(desc(NO.LISTS))
+
+
+if (cur_event_multiday) {
+  
+  # day-wise summary
+  day_sum <- data0 %>%
+    group_by(DAY.M) %>% 
+    summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
+              NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
+    arrange(desc(NO.LISTS))
+  
+  # state-day-wise summary
+  state_day_sum <- data0 %>%
+    # some lists in eBird data have no state name
+    filter(!is.na(STATE)) %>% 
+    group_by(STATE.NAME, DAY.M) %>% 
+    summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
+              NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
+    ungroup() %>% 
+    complete(STATE.NAME = cur_states_sf$STATE.NAME, 
+             DAY.M = seq(cur_event$START.DATE, cur_event$END.DATE, by = "days") %>% mday(),
+             fill = list(NO.LISTS = 0,
+                         NO.BIRDERS = 0)) %>% 
+    arrange(STATE.NAME, DAY.M)
+  
+  write_xlsx(x = list("Overall stats" = overall_stats,
+                      "Overall common species" = overall_com_spec, 
+                      "Overall top 30 birders" = top30, 
+                      "Statewise summary" = state_sum,
+                      "Statewise top birders" = top_state,
+                      "Districtwise summary" = dist_sum,
+                      "Daywise summary" = day_sum,
+                      "State-day-wise summary" = state_day_sum),
+             path = glue("{cur_outpath}{cur_event$FULL.CODE}_stats.xlsx"))
+  
+} else {
+  
+  write_xlsx(x = list("Overall stats" = overall_stats,
+                      "Overall common species" = overall_com_spec, 
+                      "Overall top 30 birders" = top30, 
+                      "Statewise summary" = state_sum,
+                      "Statewise top birders" = top_state,
+                      "Districtwise summary" = dist_sum),
+             path = glue("{cur_outpath}{cur_event$FULL.CODE}_stats.xlsx"))
+  
+}
 
 
 # regional summaries and common species -----------------------------------
@@ -368,26 +388,26 @@ write_xlsx(x = list("Overall stats" = overall_stats,
 reg_stats <- data0 %>% 
   filter(!is.na(REGION1)) %>% 
   group_by(REGION1) %>% 
-  basic_stats(prettify = F) %>% 
+  basic_stats(prettify = FALSE, pipeline = TRUE) %>% 
   # keeping only necessary
-  dplyr::select(SPECIES, LISTS.ALL) %>% 
+  dplyr::select(SPECIES, LISTS.ALL, PARTICIPANTS) %>% 
   ungroup() 
 
-
 com_spec <- data0 %>%
-  filter(ALL.SPECIES.REPORTED == 1) %>%
+  filter(ALL.SPECIES.REPORTED == 1,
+         !is.na(REGION1)) %>%
   # taking only districts with sufficient (10) lists to calculate REPFREQ
   group_by(DISTRICT.NAME) %>% 
   mutate(LISTS.D = n_distinct(GROUP.ID)) %>% 
   ungroup() %>%
   filter(LISTS.D > 10) %>%
   # repfreq
-  group_by(COMMON.NAME, REGION1, DISTRICT.NAME) %>% 
+  group_by(REGION1, COMMON.NAME, DISTRICT.NAME) %>% 
   summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.D)) %>% 
   # averaging repfreq across different districts in region
   group_by(REGION1) %>% 
   mutate(NO.DIST = n_distinct(DISTRICT.NAME)) %>% 
-  group_by(COMMON.NAME, REGION1) %>% 
+  group_by(REGION1, COMMON.NAME) %>% 
   summarise(REP.FREQ = sum(REP.FREQ)/max(NO.DIST)) %>% 
   group_by(REGION1) %>% 
   # top 5 per region
@@ -396,9 +416,55 @@ com_spec <- data0 %>%
   ungroup()
 
 
-write_xlsx(x = list("Stats" = reg_stats, 
-                    "Common species" = com_spec),
-           path = glue("{cur_outpath}{cur_event$FULL.CODE}_regions.xlsx"))
+# also stats per country for HBC
+if (cur_event$SHORT.CODE == "HBC") {
+  
+  reg_stats_countries <- data0 %>% 
+    filter(!is.na(REGION1) | COUNTRY %in% c("Bhutan", "Nepal")) %>% 
+    group_by(COUNTRY) %>% 
+    basic_stats(prettify = FALSE, pipeline = TRUE) %>% 
+    # keeping only necessary
+    dplyr::select(SPECIES, LISTS.ALL, PARTICIPANTS) %>% 
+    ungroup() 
+  
+  com_spec_countries <- data0 %>%
+    filter(ALL.SPECIES.REPORTED == 1,
+           !is.na(REGION1) | COUNTRY %in% c("Bhutan", "Nepal")) %>%
+    # taking only districts with sufficient (10) lists to calculate REPFREQ
+    group_by(DISTRICT.NAME) %>% 
+    mutate(LISTS.D = n_distinct(GROUP.ID)) %>% 
+    ungroup() %>%
+    filter(LISTS.D > 10) %>%
+    # repfreq
+    group_by(COUNTRY, COMMON.NAME, DISTRICT.NAME) %>% 
+    summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS.D)) %>% 
+    # averaging repfreq across different districts in region
+    group_by(COUNTRY) %>% 
+    mutate(NO.DIST = n_distinct(DISTRICT.NAME)) %>% 
+    group_by(COUNTRY, COMMON.NAME) %>% 
+    summarise(REP.FREQ = sum(REP.FREQ)/max(NO.DIST)) %>% 
+    group_by(COUNTRY) %>% 
+    # top 5 per region
+    arrange(desc(REP.FREQ), .by_group = T) %>% 
+    slice(1:5) %>% 
+    ungroup()
+  
+  write_xlsx(x = list("Stats (regions)" = reg_stats, 
+                      "Common species (regions)" = com_spec,
+                      "Stats (countries)" = reg_stats_countries, 
+                      "Common species (countries)" = com_spec_countries),
+             path = glue("{cur_outpath}{cur_event$FULL.CODE}_regions.xlsx"))
+  
+  
+} else {
+  
+  write_xlsx(x = list("Stats" = reg_stats, 
+                      "Common species" = com_spec),
+             path = glue("{cur_outpath}{cur_event$FULL.CODE}_regions.xlsx"))
+  
+  
+}
+
 
 
 # plot districtwise stats on map ----------------------------------------------------
