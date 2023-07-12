@@ -147,7 +147,8 @@ if (cur_event$SHORT.CODE == "HBC"){
               by = c("YEAR" = "EDITION")) %>% 
     filter(OBSERVATION.DATE >= START.DATE & OBSERVATION.DATE <= END.DATE) %>% 
     ungroup() %>% 
-    mutate(START.DATE = NULL, END.DATE = NULL)
+    mutate(START.DATE = NULL, END.DATE = NULL) %>% 
+    join_BT_NP_sf()
 
   
   data0 <- data0 %>% mutate(COUNTRY = "India") 
@@ -255,6 +256,31 @@ rm(temp)
 # overall stats
 overall_stats <- basic_stats(data0)
 
+# change over time
+over_time <- data_all %>% 
+  group_by(YEAR) %>% 
+  basic_stats(pipeline = T, prettify = T)
+
+over_time_yoy_overall <- over_time %>% 
+  dplyr::select(YEAR, `lists (all types)`, `eBirders`, `species`) %>% 
+  magrittr::set_colnames(c("YEAR", "Total checklists", "Participants", "Species")) %>% 
+  pivot_longer(!matches("YEAR"), names_to = "STAT", values_to = "VALUES") %>% 
+  pivot_wider(names_from = YEAR, values_from = VALUES) %>% 
+  mutate(YOY = 100*(`2023`-`2022`)/`2022`)
+
+over_time_yoy_reg <- data_all %>% 
+  group_by(COUNTRY, YEAR) %>% 
+  basic_stats(pipeline = T, prettify = T) %>% 
+  ungroup() %>% 
+  dplyr::select(COUNTRY, YEAR, `lists (all types)`, `eBirders`, `species`) %>% 
+  magrittr::set_colnames(c("COUNTRY", "YEAR", "Total checklists", "Participants", "Species")) %>%
+  group_by(COUNTRY) %>% 
+  pivot_longer(c("Total checklists", "Participants", "Species"), 
+               names_to = "STAT", values_to = "VALUES") %>% 
+  pivot_wider(names_from = YEAR, values_from = VALUES) %>% 
+  mutate(YOY = 100*(`2023`-`2022`)/`2022`)
+
+# common species overall
 overall_com_spec <- data0 %>%
   filter(ALL.SPECIES.REPORTED == 1) %>%
   # taking only districts with sufficient (10) lists to calculate REPFREQ
@@ -314,9 +340,10 @@ state_sum <- data0 %>%
   }} %>% 
   summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
             NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
-  complete(STATE.NAME = cur_states_sf$STATE.NAME, 
-           fill = list(NO.LISTS = 0,
-                       NO.BIRDERS = 0)) %>% 
+  right_join(cur_states_sf %>% st_drop_geometry()) %>% 
+  mutate(NO.LISTS = replace_na(NO.LISTS, 0),
+         NO.BIRDERS = replace_na(NO.BIRDERS, 0)) %>% 
+  relocate(COUNTRY, STATE.NAME, NO.LISTS, NO.BIRDERS) %>% 
   arrange(desc(NO.LISTS))
 
 
@@ -331,9 +358,10 @@ dist_sum <- data0 %>%
   }} %>% 
   summarise(NO.LISTS = n_distinct(SAMPLING.EVENT.IDENTIFIER),
             NO.BIRDERS = n_distinct(OBSERVER.ID)) %>%
-  complete(DISTRICT.NAME = cur_dists_sf$DISTRICT.NAME, 
-           fill = list(NO.LISTS = 0,
-                       NO.BIRDERS = 0)) %>% 
+  right_join(cur_dists_sf %>% st_drop_geometry() %>% dplyr::select(-STATE.NAME)) %>% 
+  mutate(NO.LISTS = replace_na(NO.LISTS, 0),
+         NO.BIRDERS = replace_na(NO.BIRDERS, 0)) %>% 
+  relocate(COUNTRY, DISTRICT.NAME, NO.LISTS, NO.BIRDERS) %>% 
   arrange(desc(NO.LISTS))
 
 
@@ -361,6 +389,8 @@ if (cur_event_multiday) {
     arrange(STATE.NAME, DAY.M)
   
   write_xlsx(x = list("Overall stats" = overall_stats,
+                      "YoY stats (overall)" = over_time_yoy_overall,
+                      "YoY stats (countries)" = over_time_yoy_reg,
                       "Overall common species" = overall_com_spec, 
                       "Overall top 30 birders" = top30, 
                       "Statewise summary" = state_sum,
@@ -373,6 +403,8 @@ if (cur_event_multiday) {
 } else {
   
   write_xlsx(x = list("Overall stats" = overall_stats,
+                      "YoY stats (overall)" = over_time_yoy_overall,
+                      "YoY stats (countries)" = over_time_yoy_reg,
                       "Overall common species" = overall_com_spec, 
                       "Overall top 30 birders" = top30, 
                       "Statewise summary" = state_sum,
@@ -419,14 +451,24 @@ com_spec <- data0 %>%
 # also stats per country for HBC
 if (cur_event$SHORT.CODE == "HBC") {
   
-  reg_stats_countries <- data0 %>% 
+  reg_stats_cov <- data0 %>% 
     filter(!is.na(REGION1) | COUNTRY %in% c("Bhutan", "Nepal")) %>% 
-    group_by(COUNTRY) %>% 
-    basic_stats(prettify = FALSE, pipeline = TRUE) %>% 
-    # keeping only necessary
-    dplyr::select(SPECIES, LISTS.ALL, PARTICIPANTS) %>% 
-    ungroup() 
-  
+    group_by(COUNTRY) %>%
+    summarise(NO.STATES = n_distinct(STATE.NAME)) %>% 
+    right_join(cur_states_sf %>% 
+                 st_drop_geometry() %>% 
+                 group_by(COUNTRY) %>% 
+                 summarise(TOT.STATES = n_distinct(STATE.NAME))) 
+
+    reg_stats_countries <- data0 %>% 
+      filter(!is.na(REGION1) | COUNTRY %in% c("Bhutan", "Nepal")) %>% 
+      group_by(COUNTRY) %>% 
+      basic_stats(prettify = FALSE, pipeline = TRUE) %>% 
+      # keeping only necessary
+      dplyr::select(SPECIES, LISTS.ALL, PARTICIPANTS) %>% 
+      ungroup() %>% 
+      left_join(reg_stats_cov)
+    
   com_spec_countries <- data0 %>%
     filter(ALL.SPECIES.REPORTED == 1,
            !is.na(REGION1) | COUNTRY %in% c("Bhutan", "Nepal")) %>%
@@ -661,11 +703,6 @@ ggsave(filename = glue("{cur_outpath}{cur_event$FULL.CODE}_regionmap.png"),
 
 
 # comparison with prev: yearly summaries --------------------------------------------------------
-
-over_time <- data_all %>% 
-  group_by(YEAR) %>% 
-  basic_stats(pipeline = T, prettify = T)
-
 
 data1 <- over_time %>%
   # keeping only necessary

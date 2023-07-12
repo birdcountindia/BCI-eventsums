@@ -24,6 +24,9 @@ rel_date <- if (today() %>% day() <= 16) {
   (today() - months(1)) %>%
     floor_date(unit = "month")
 }
+# cur_date <- "2023-06-12" %>% as_date() %>% floor_date(unit = "month")
+# rel_date <- "2023-05-12" %>% as_date() %>% floor_date(unit = "month")
+
 
 cur_year <- cur_date %>% year()
 cur_month_num <- cur_date %>% month()
