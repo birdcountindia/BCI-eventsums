@@ -133,6 +133,9 @@ data_all <- data %>%
 
 if (cur_event$SHORT.CODE == "HBC"){
   
+  in_him_states <- c("Ladakh","Jammu and Kashmir","Himachal Pradesh","Uttarakhand",
+                     "Sikkim","Arunachal Pradesh")
+  
   bt_np <- bind_rows(data_BT, data_NP) %>% 
     filter(OBSERVATION.DATE %in% seq(cur_event$START.DATE, cur_event$END.DATE,
                                      by = "days")) %>%
@@ -163,14 +166,14 @@ if (cur_event$SHORT.CODE == "HBC"){
   
   cur_dists_sf <- dists_sf %>%
     dplyr::select(-AREA) %>% 
-    filter(DISTRICT.NAME %in% c("Darjeeling","Kalimpong","Alipurduar","Hoshiarpur","Rupnagar",
-                                "Pilibhit","Lakhimpur Kheri","Kokrajhar","Chirang","Baksa",
-                                "Sonitpur","Dhemaji","Lakhimpur","Panchkula","Udalguri","Biswanath",
-                                "Kheri","Pathankot","Una","Sahibzada Ajit Singh Nagar","Saharanpur",
-                                "Yamunanagar","Bahraich","Shrawasti","Balrampur","Pashchim Champaran",
-                                "Purba Champaran") |
-             STATE.NAME %in% c("Ladakh","Jammu and Kashmir","Himachal Pradesh","Uttarakhand",
-                               "Sikkim","Arunachal Pradesh")) %>% 
+    filter(DISTRICT.NAME %in% c("Darjeeling","Kalimpong","Alipurduar","Jalpaiguri",
+                                "Hoshiarpur","Rupnagar","Pilibhit","Lakhimpur Kheri",
+                                "Kokrajhar","Chirang","Baksa","Sonitpur","Dhemaji",
+                                "Lakhimpur","Panchkula","Udalguri","Biswanath",
+                                "Kheri","Pathankot","Una","Sahibzada Ajit Singh Nagar",
+                                "Saharanpur","Yamunanagar","Bahraich","Shrawasti",
+                                "Balrampur","Pashchim Champaran","Purba Champaran") |
+             STATE.NAME %in% in_him_states) %>% 
     # retain Hamirpur in HP and remove the one in UP
     filter((STATE.NAME != "Uttar Pradesh" | DISTRICT.NAME != "Hamirpur") &
              # remove CT completely because Bilaspur is found in CT as well as HP
@@ -178,17 +181,17 @@ if (cur_event$SHORT.CODE == "HBC"){
     mutate(COUNTRY = "India") %>% 
     bind_rows(bt_dists_sf, np_dists_sf)
   
-  cur_states_sf <- states_sf %>%
-    dplyr::select(-AREA) %>% 
-    filter(STATE.NAME %in% cur_dists_sf$STATE.NAME) %>% 
-    mutate(COUNTRY = "India") %>% 
+  cur_states_sf <- cur_dists_sf %>%
+    group_by(COUNTRY, STATE.NAME) %>% 
+    dplyr::summarise() %>% 
+    rename(STATE.GEOM = DISTRICT.GEOM) %>% 
     bind_rows(bt_states_sf, np_states_sf)
   
   
   # combining all countries
   data0 <- data0 %>% 
     bind_rows(bt_np) %>%
-    filter((STATE.NAME %in% cur_states_sf$STATE.NAME | 
+    filter((STATE.NAME %in% in_him_states | 
              DISTRICT.NAME %in% cur_dists_sf$DISTRICT.NAME) & 
              # retain Hamirpur in HP and remove the one in UP
              (STATE.NAME != "Uttar Pradesh" | DISTRICT.NAME != "Hamirpur") &
@@ -197,7 +200,7 @@ if (cur_event$SHORT.CODE == "HBC"){
   
   data_all <- data_all %>% 
     bind_rows(bt_np_all) %>%
-    filter((STATE.NAME %in% cur_states_sf$STATE.NAME | 
+    filter((STATE.NAME %in% in_him_states | 
               DISTRICT.NAME %in% cur_dists_sf$DISTRICT.NAME) & 
              # retain Hamirpur in HP and remove the one in UP
              (STATE.NAME != "Uttar Pradesh" | DISTRICT.NAME != "Hamirpur") &
