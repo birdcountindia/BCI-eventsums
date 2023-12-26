@@ -8,6 +8,7 @@ require(leaflet)
 require(writexl)
 require(ggthemes)
 require(osmdata)
+require(rmapshaper)
 
 
 cur_event_multiday <- (cur_event$END.DATE - cur_event$START.DATE) != 0
@@ -180,12 +181,19 @@ if (cur_event$SHORT.CODE == "HBC"){
              (STATE.NAME != "Chhattisgarh")) %>% 
     mutate(COUNTRY = "India") %>% 
     bind_rows(bt_dists_sf, np_dists_sf)
-  
-  cur_states_sf <- cur_dists_sf %>%
+    
+  non_him_states <- cur_dists_sf %>% 
+    filter(!STATE.NAME %in% in_him_states) %>% 
     group_by(COUNTRY, STATE.NAME) %>% 
     dplyr::summarise() %>% 
-    rename(STATE.GEOM = DISTRICT.GEOM) %>% 
-    bind_rows(bt_states_sf, np_states_sf)
+    ungroup() %>% 
+    rename(STATE.GEOM = DISTRICT.GEOM) 
+    
+  cur_states_sf <- states_sf %>% 
+    dplyr::select(-AREA) %>% 
+    filter(STATE.NAME %in% in_him_states) %>% 
+    mutate(COUNTRY = "India") %>% 
+    bind_rows(non_him_states, bt_states_sf, np_states_sf)
   
   
   # combining all countries
@@ -557,6 +565,11 @@ in_him_states <- cur_states_sf %>%
                             "West Bengal","Bihar","Chhattisgarh") &
            COUNTRY == "India")
 
+# simplifying the spatial features
+dist_stats <- dist_stats %>% 
+  ms_simplify(keep = 0.03, keep_shapes = FALSE)
+
+
 mapviewOptions(fgb = FALSE)
 map_effort_dist <- mapView(dist_stats, 
                            zcol = c("Total checklists"), 
@@ -570,13 +583,13 @@ map_effort_dist <- mapView(dist_stats,
                            at = break_at, 
                            alpha.regions = 0.6) +
   # country outlines
-  mapView(in_him_states, color = "black", fill = NA, lwd = 2,
+  mapView(in_him_states, color = "black", fill = NA, lwd = 1.5,
           popup = FALSE, highlight = FALSE, legend = FALSE, 
           label = NA, alpha.regions = 0) +
-  mapView(np_sf, color = "black", fill = NA, lwd = 4,
+  mapView(np_sf, color = "black", fill = NA, lwd = 3,
           popup = FALSE, highlight = FALSE, legend = FALSE, 
           label = NA, alpha.regions = 0) +
-  mapView(bt_sf, color = "black", fill = NA, lwd = 4,
+  mapView(bt_sf, color = "black", fill = NA, lwd = 3,
           popup = FALSE, highlight = FALSE, legend = FALSE, 
           label = NA, alpha.regions = 0)
 
@@ -625,6 +638,10 @@ break_at <- break_at <- if (max_lists %in% 0:200) {
 } else if (max_lists > 8000) {
   rev(c(0, 50, 200, 500, 1000, 3000, 6000, max_lists))
 } 
+
+# simplifying the spatial features
+state_stats <- state_stats %>% 
+  ms_simplify(keep = 0.05, keep_shapes = FALSE)
 
 
 mapviewOptions(fgb = FALSE)
