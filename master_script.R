@@ -11,21 +11,43 @@ if (anyevent == FALSE) {
   
 } else {
   
-  list_national <- sched %>% filter(CATEGORY == "National")
-  
-  list_regional <- sched %>% filter(CATEGORY == "Regional")
-  
-  list_multiregional <- sched %>% filter(CATEGORY == "Multi-regional")
+  list_simple <- sched %>% filter(!(TYPE.CODE %in% c("GBBC", "HBC")))
+  # only GBBC and HBC need complex summaries
+  list_national <- sched %>% filter(TYPE.CODE == "GBBC")
+  list_multiregional <- sched %>% filter(TYPE.CODE == "HBC")
   
   source("scripts/03_data-import.R")
   
+
+  ## running corresponding analyses depending on which events present in this month
   
   
-## running corresponding analyses depending on which events present in this month
+  if (rlang::is_empty(list_simple$FULL.NAME)) {
+    
+    message("No simple-summary events.")
+    
+  } else {
+    
+    # for each event
+    for (i in 1:length(list_simple$FULL.NAME)) {
+      
+      cur_event <- list_simple[i,] # paths
+      cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION}/")
+      if (!dir.exists(cur_outpath)) (dir.create(cur_outpath, recursive = T))
+      
+      tictoc::tic(glue("Completed analysis {i}/{length(list_simple$FULL.NAME)}: {cur_event$FULL.CODE}"))
+      rmarkdown::render("event_simple_summary.Rmd",
+                        output_dir = cur_outpath, output_file = "summary_post")
+      tictoc::toc()
+      
+    }
+    
+  }
+  
   
   if (rlang::is_empty(list_national$FULL.NAME)) {
     
-    print("No national events.")
+    message("No national events.")
     
   } else {
     
@@ -41,29 +63,10 @@ if (anyevent == FALSE) {
     
   }
   
-  
-  if (rlang::is_empty(list_regional$FULL.NAME)) {
-    
-    print("No regional events.")
-    
-  } else {
-    
-    # for each event
-    for (i in 1:length(list_regional$FULL.NAME)) {
-      
-      cur_event <- list_regional[i,] 
-      tictoc::tic(glue("Completed analysis {i}/{length(list_regional$FULL.NAME)}: {cur_event$FULL.CODE}"))
-      source("scripts/event_regional.R")
-      tictoc::toc()
-      
-    }
-    
-  }
-  
 
   if (rlang::is_empty(list_multiregional$FULL.NAME)) {
     
-    print("No multi-regional events.")
+    message("No multi-regional events.")
     
   } else {
     

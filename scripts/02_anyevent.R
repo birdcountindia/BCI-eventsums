@@ -24,8 +24,8 @@ sched0 <- read_sheet("https://docs.google.com/spreadsheets/d/1Yf_STtmbtPZHybwT54
 
 sched <- sched0 %>% 
   # filtering for current month of interest
-  filter(EDITION == rel_year,
-         START.MONTH %in% rel_month_num | END.MONTH %in% rel_month_num)
+  filter(EDITION == currel_year,
+         START.MONTH %in% currel_month_num | END.MONTH %in% currel_month_num)
 
 
 ## is there any event?
