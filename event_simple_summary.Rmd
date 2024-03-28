@@ -44,12 +44,17 @@ get_dates(seq(cur_event$START.DATE, cur_event$END.DATE, by = "days"))
 # filtering for loc & dates
 
 # get required admin units
-cur_region <- get_admin_codes(hi_arch = FALSE,
-                              unit_code = if (cur_event$SHORT.CODE == "TEBC"){
-                                "IN-NL"
-                              } else if (cur_event$SHORT.CODE == "SABC"){
-                                "IN"
-                              })
+cur_unit_code <- if (cur_event$SHORT.CODE == "TEBC"){
+  "IN-NL"
+} else if (cur_event$SHORT.CODE == "SABC"){
+  "IN"
+} else if (cur_event$SHORT.CODE == "PBC"){
+  "IN-TN"
+} else if (cur_event$SHORT.CODE == "BBC"){
+  "IN-AS"
+}
+
+cur_region <- get_admin_codes(hi_arch = FALSE, unit_code = cur_unit_code)
 cur_region_children <- get_admin_codes(cur_region, hi_arch = TRUE) %>% 
   setdiff(cur_region)
 

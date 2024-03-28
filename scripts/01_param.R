@@ -10,7 +10,8 @@ userspath <- glue("../ebird-datasets/EBD/ebd_users_relFeb-2024.txt")
 senspath <- glue("../ebird-datasets/EBD/ebd_sensitive_relFeb-2024_IN.txt")
 groupaccspath <- glue("../ebird-datasets/group-accounts/ebd_users_GA_relFeb-2024.csv")
 
-get_param()
+# get_param()
+get_param(date_currel = "2024-01-01")
 
 
 maindatapath <-  glue("../ebird-datasets/EBD/ebd_IN_rel{currel_month_lab}-{currel_year}.RData")

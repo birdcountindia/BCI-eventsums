@@ -22,27 +22,27 @@ if (anyevent == FALSE) {
   ## running corresponding analyses depending on which events present in this month
   
   
-  # if (rlang::is_empty(list_simple$FULL.NAME)) {
-  #   
-  #   message("No simple-summary events.")
-  #   
-  # } else {
-  #   
-  #   # for each event
-  #   for (i in 1:length(list_simple$FULL.NAME)) {
-  #     
-  #     cur_event <- list_simple[i,] # paths
-  #     cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION}/")
-  #     if (!dir.exists(cur_outpath)) (dir.create(cur_outpath, recursive = T))
-  #     
-  #     tictoc::tic(glue("Completed analysis {i}/{length(list_simple$FULL.NAME)}: {cur_event$FULL.CODE}"))
-  #     rmarkdown::render("event_simple_summary.Rmd",
-  #                       output_dir = cur_outpath, output_file = "summary_post")
-  #     tictoc::toc()
-  #     
-  #   }
-  #   
-  # }
+  if (rlang::is_empty(list_simple$FULL.NAME)) {
+
+    message("No simple-summary events.")
+
+  } else {
+
+    # for each event
+    for (i in 1:length(list_simple$FULL.NAME)) {
+
+      cur_event <- list_simple[i,] # paths
+      cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION}/")
+      if (!dir.exists(cur_outpath)) (dir.create(cur_outpath, recursive = T))
+
+      tictoc::tic(glue("Completed analysis {i}/{length(list_simple$FULL.NAME)}: {cur_event$FULL.CODE}"))
+      rmarkdown::render("event_simple_summary.Rmd",
+                        output_dir = cur_outpath, output_file = "summary_post")
+      tictoc::toc()
+
+    }
+
+  }
   
   
   if (rlang::is_empty(list_national$FULL.NAME)) {
