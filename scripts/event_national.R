@@ -14,8 +14,8 @@ library(rmapshaper)
 cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION}/")
 if (!dir.exists(cur_outpath)) (dir.create(cur_outpath, recursive = T))
 
-source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/summaries.R")
-source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/mapping.R")
+source("https://github.com/birdcountindia/bci-functions/raw/main/01_functions/summaries.R")
+source("https://github.com/birdcountindia/bci-functions/raw/main/01_functions/mapping.R")
 
 
 # preparing data ----------------------------------------------------------
@@ -44,7 +44,7 @@ if (cur_event$SHORT.CODE == "GBBC"){
 
   # joining campus information to data for CBC
   campus <- read_sheet("https://docs.google.com/spreadsheets/d/1ZPCO_Yy7jjKlP3RYdT5ostbsS1G0zvgsl7IJ5mLoIzA/edit?usp=sharing",
-                       sheet = glue("{cur_year}")) %>% 
+                       sheet = glue("{currel_year}")) %>% 
     magrittr::set_colnames(c("CAMPUS", "LOCALITY.ID")) %>% 
     # some campuses with >1 hotspot have listed multiple IDs in one row
     group_by(CAMPUS) %>% 
@@ -197,8 +197,13 @@ birder_state <- data_birder %>%
   filter(!is.na(STATE)) %>% 
   distinct(STATE.NAME, OBSERVER.ID) %>%
   # joining names
-  left_join(eBird_users) %>% 
-  arrange(STATE.NAME)
+  left_join(eBird_users) %>%
+  arrange(STATE.NAME) %>% select(-OBSERVER.ID)
+
+birder_state <- birder_state %>%
+  group_by(STATE.NAME) %>%
+  summarise(FULL.NAME = toString(FULL.NAME)) %>%
+  ungroup()
 
 # district-wise summary
 dist_sum <- data0 %>%
@@ -538,7 +543,7 @@ plot1 <- ggplot(data1, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Unique checklists", "Total checklists", "Person hours"), 
                       values = palette) +
-  scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:currel_year) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
                      limits = c(min(plot_breaks), max(plot_breaks)))
@@ -551,7 +556,7 @@ plot2 <- ggplot(data2, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Participants"), 
                       values = palette) +
-  scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:currel_year) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
                      limits = c(min(plot_breaks), max(plot_breaks)))
@@ -566,7 +571,7 @@ plot3 <- ggplot(data3, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Species"), 
                       values = palette) +
-  scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:currel_year) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
                      limits = c(min(plot_breaks), max(plot_breaks)))
@@ -580,7 +585,7 @@ plot4 <- ggplot(data4, aes(x = YEAR, y = VALUES, col = STAT)) +
   theme_mod_tufte() +
   scale_colour_manual(breaks = c("Districts"), 
                       values = palette) +
-  scale_x_continuous(breaks = 2013:2023) +
+  scale_x_continuous(breaks = 2013:currel_year) +
   scale_y_continuous(breaks = plot_breaks, 
                      labels = scales::label_comma()(plot_breaks),
                      limits = c(min(plot_breaks), max(plot_breaks)))
@@ -630,7 +635,7 @@ plot5 <- ggplot(yearly_com_spec, aes(x = YEAR, y = REP.FREQ, col = COMMON.NAME))
   labs(x = "Years", y = "Frequency (%)") +
   theme_mod_tufte() +
   theme(axis.title.y = element_text(angle = 90, size = 16)) +
-  scale_x_continuous(breaks = 2015:2023) +
+  scale_x_continuous(breaks = 2015:currel_year) +
   scale_colour_manual(breaks = c("Common Myna", "Rock Pigeon", "Red-vented Bulbul"), 
                       values = palette) 
 

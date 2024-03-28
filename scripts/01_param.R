@@ -6,9 +6,9 @@ require(skimmr)
 # automated parameters ----------------------------------------------------
 
 # paths to latest versions of user & GA info, and sensitive species data
-userspath <- glue("../ebird-datasets/EBD/ebd_users_relNov-2023.txt")
-senspath <- glue("../ebird-datasets/EBD/ebd_sensitive_relNov-2023_IN.txt")
-groupaccspath <- glue("../ebird-datasets/group-accounts/ebd_users_GA_relNov-2023.csv")
+userspath <- glue("../ebird-datasets/EBD/ebd_users_relFeb-2024.txt")
+senspath <- glue("../ebird-datasets/EBD/ebd_sensitive_relFeb-2024_IN.txt")
+groupaccspath <- glue("../ebird-datasets/group-accounts/ebd_users_GA_relFeb-2024.csv")
 
 get_param()
 
