@@ -197,13 +197,11 @@ birder_state <- data_birder %>%
   filter(!is.na(STATE)) %>% 
   distinct(STATE.NAME, OBSERVER.ID) %>%
   # joining names
-  left_join(eBird_users) %>%
-  arrange(STATE.NAME) %>% select(-OBSERVER.ID)
-
-birder_state <- birder_state %>%
+  left_join(eBird_users, by = "OBSERVER.ID") %>%
+  arrange(STATE.NAME, FULL.NAME) %>% 
+  # flattening list of birder names to display in single row per state
   group_by(STATE.NAME) %>%
-  summarise(FULL.NAME = toString(FULL.NAME)) %>%
-  ungroup()
+  reframe(FULL.NAME = str_flatten_comma(FULL.NAME)) 
 
 # district-wise summary
 dist_sum <- data0 %>%
