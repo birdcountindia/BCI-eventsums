@@ -50,7 +50,7 @@ cur_unit_code <- if (cur_event$SHORT.CODE == "TEBC"){
   "IN"
 } else if (cur_event$SHORT.CODE == "PBC"){
   "IN-TN"
-} else if (cur_event$SHORT.CODE == "BBC"){
+} else if (cur_event$SHORT.CODE == "BiBC"){
   "IN-AS"
 }
 
@@ -77,11 +77,16 @@ data0 <- data %>%
 ```{r data-processing, include=FALSE}
 
 # species lists & participation summaries
-spec_list_main <- gen_spec_list_nonAPI(data0, cur_region, dates_cur)
+spec_list_main <- gen_spec_list_nonAPI(data0, cur_region, dates_cur, repfreq = TRUE)
 part_summ_main <- gen_part_summ_nonAPI(data0, cur_region, dates_cur)
 
-spec_list_sub <- gen_spec_list_nonAPI(data0, cur_region_children, dates_cur)
+spec_list_sub <- gen_spec_list_nonAPI(data0, cur_region_children, dates_cur, repfreq = TRUE)
 part_summ_sub <- gen_part_summ_nonAPI(data0, cur_region_children, dates_cur) 
+
+# writing list of species
+write_xlsx(x = list("Overall" = spec_list_main,
+                    "Subregions" = spec_list_sub),
+           path = glue("{cur_outpath}spec_list.xlsx"))
 
 # notable species (SoIB)
 spec_list_notable <- map_to_soib(spec_list_main) %>% 

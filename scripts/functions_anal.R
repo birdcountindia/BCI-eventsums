@@ -132,7 +132,7 @@ get_admin_names <- function(region_input) {
 
 # summary functions -------------------------------------------------------
 
-gen_spec_list_nonAPI <- function(data, regions, dates) {
+gen_spec_list_nonAPI <- function(data, regions, dates, repfreq = FALSE) {
   
   # regardless if regions = cur_region or regions = cur_region_children, parent 
   # will be cur_region
@@ -153,6 +153,19 @@ gen_spec_list_nonAPI <- function(data, regions, dates) {
     filter(REGION %in% regions) %>% 
     filter(CATEGORY %in% c("species", "issf"))
   
+  spec_rf <- data1 %>%
+    filter(ALL.SPECIES.REPORTED == 1) %>%
+    group_by(REGION) %>% 
+    mutate(LISTS = n_distinct(GROUP.ID)) %>% 
+    ungroup() %>%
+    # repfreq
+    group_by(COMMON.NAME, REGION) %>% 
+    summarise(REP.FREQ = 100*n_distinct(GROUP.ID)/max(LISTS)) %>% 
+    ungroup() %>% 
+    # top per region
+    arrange(desc(REP.FREQ))
+  
+  
   list_spec <- data1 %>% 
     distinct(REGION, COMMON.NAME, OBSERVATION.DATE) %>% 
     mutate(OBSERVATION.DATE = as_date(OBSERVATION.DATE)) %>% 
@@ -166,7 +179,12 @@ gen_spec_list_nonAPI <- function(data, regions, dates) {
     mutate(PRESENT = 1) %>% 
     pivot_wider(names_from = "DAY.NO", names_glue = "DAY{DAY.NO}", values_from = "PRESENT") %>% 
     mutate(across(starts_with("DAY"), ~ replace_na(., replace = 0))) %>% 
-    arrange(REGION, across(starts_with("DAY"), desc))
+    arrange(REGION, across(starts_with("DAY"), desc)) %>% 
+    {if (repfreq == TRUE) {
+      left_join(., spec_rf, by = c("COMMON.NAME", "REGION"))
+    } else {
+      .
+    }}
   
   return(list_spec)
   
