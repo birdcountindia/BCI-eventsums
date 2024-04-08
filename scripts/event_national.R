@@ -657,6 +657,16 @@ if (cur_event$SHORT.CODE == "GBBC"){
     distinct(CAMPUS, COMMON.NAME) %>% 
     rename(MOST.COM = COMMON.NAME)
   
+  # list of participants per campus hotspot
+  campus_people <- data_campus %>% 
+    distinct(CAMPUS, FULL.NAME) %>% 
+    arrange(CAMPUS, FULL.NAME) %>% 
+    group_by(CAMPUS) %>% 
+    reframe(PARTICIPANTS = str_flatten_comma(FULL.NAME))
+  
+  write.csv(campus_people, row.names = FALSE, 
+            file = glue("{cur_outpath}{cur_event$FULL.CODE}_CBC_birdersperhotspot.csv"))
+  
   campus_stats <- data_campus %>% 
     group_by(CAMPUS) %>% 
     basic_stats(pipeline = T, prettify = F) %>% 
