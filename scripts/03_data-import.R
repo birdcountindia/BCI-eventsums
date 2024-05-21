@@ -32,7 +32,13 @@ filtGA <- groupaccs %>%
   # other group accs
   bind_rows(data.frame(OBSERVER.ID = c("obsr852457", "obsr949737", "obsr3585830", 
                                        "obsr2972613", "obsr1927965",
-                                       "obsr2991603", "obsr3000697")))
+                                       "obsr2991603", "obsr3000697",
+                                       "obsr3605114", "obsr877303",
+                                       "obsr3496258", "obsr2991603",
+                                       "obsr4738731", "obsr4738720",
+                                       "obsr865926", "obsr4736381",
+                                       "obsr881807", "obsr2964356",
+                                       "obsr4299422")))
 
 
 # including some group accounts for GBBC like Salem School Students accounts
