@@ -52,6 +52,8 @@ cur_unit_code <- if (cur_event$SHORT.CODE == "TEBC"){
   "IN-TN"
 } else if (cur_event$SHORT.CODE == "BiBC"){
   "IN-AS"
+} else if (cur_event$SHORT.CODE == "PBBC"){
+  "IN-WB"
 }
 
 cur_region <- get_admin_codes(hi_arch = FALSE, unit_code = cur_unit_code)
