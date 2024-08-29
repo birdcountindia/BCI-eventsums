@@ -46,7 +46,7 @@ get_dates(seq(cur_event$START.DATE, cur_event$END.DATE, by = "days"))
 # get required admin units
 cur_unit_code <- if (cur_event$SHORT.CODE == "TEBC"){
   "IN-NL"
-} else if (cur_event$SHORT.CODE == "SABC"){
+} else if (cur_event$SHORT.CODE %in% c("SABC", "EBD")){
   "IN"
 } else if (cur_event$SHORT.CODE == "PBC"){
   "IN-TN"
@@ -227,9 +227,14 @@ Thanks to all birdwatchers and nature enthusiasts from across the country who ma
 ```{r table1, tab.cap=glue("Total number of lists uploaded from {what_subregions}"), out.width="100%"}
 
 tab1 <- part_summ_sub %>% 
-  filter(TOTAL == "CHECKLISTS") %>% 
-  dplyr::select(-TOTAL) %>% 
-  arrange(desc(as.numeric(ALL.DAYS)))
+  {if (length(dates_cur) == 1) {
+    dplyr::select(., REGION, REGION.NAME, CHECKLISTS) %>% 
+      arrange(desc(CHECKLISTS))
+  } else if (length(dates_cur) > 1) {
+    filter(., TOTAL == "CHECKLISTS") %>% 
+      dplyr::select(-TOTAL) %>% 
+      arrange(desc(as.numeric(ALL.DAYS)))
+  }}
 
 write_csv(tab1, glue("{cur_outpath}summary_tab1.csv"))
 
@@ -250,9 +255,14 @@ tab1 %>%
 ```{r table2, tab.cap=glue("Total number of species reported from {what_subregions}"), out.width="100%"}
 
 tab2 <- part_summ_sub %>% 
-  filter(TOTAL == "SPECIES") %>% 
-  dplyr::select(-TOTAL) %>% 
-  arrange(desc(as.numeric(ALL.DAYS)))
+  {if (length(dates_cur) == 1) {
+    dplyr::select(., REGION, REGION.NAME, SPECIES) %>% 
+      arrange(desc(SPECIES))
+  } else if (length(dates_cur) > 1) {
+    filter(., TOTAL == "SPECIES") %>% 
+      dplyr::select(-TOTAL) %>% 
+      arrange(desc(as.numeric(ALL.DAYS)))
+  }}
 
 write_csv(tab2, glue("{cur_outpath}summary_tab2.csv"))
 

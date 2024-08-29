@@ -17,18 +17,18 @@ cur_event_multiday <- (cur_event$END.DATE - cur_event$START.DATE) != 0
 cur_outpath <- glue("outputs/{cur_event$SHORT.CODE}/{cur_event$EDITION}/")
 if (!dir.exists(cur_outpath)) (dir.create(cur_outpath, recursive = T))
 
-source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/summaries.R")
-source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/mapping.R")
+source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/01_functions/summaries.R")
+source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/01_functions/mapping.R")
 
 
 # loading BT and NP data --------------------------------------------------
 
 if (cur_event$SHORT.CODE == "HBC"){
   
-  bhu_zippath <-  glue("../ebird-datasets/EBD/ebd_BT_rel{currel_month_lab}-{currel_year}.zip")
-  nep_zippath <-  glue("../ebird-datasets/EBD/ebd_NP_rel{currel_month_lab}-{currel_year}.zip")
-  bhu_rawfile <-  glue("ebd_BT_rel{currel_month_lab}-{currel_year}.txt")
-  nep_rawfile <-  glue("ebd_NP_rel{currel_month_lab}-{currel_year}.txt")
+  bhu_zippath <-  glue("../ebird-datasets/EBD/ebd_BT_relJul-2024.zip")
+  nep_zippath <-  glue("../ebird-datasets/EBD/ebd_NP_relJul-2024.zip")
+  bhu_rawfile <-  glue("ebd_BT_relJul-2024.txt")
+  nep_rawfile <-  glue("ebd_NP_relJul-2024.txt")
   bhu_rawpath <-  glue("../ebird-datasets/EBD/{bhu_rawfile}")
   nep_rawpath <-  glue("../ebird-datasets/EBD/{nep_rawfile}")
   
@@ -273,23 +273,33 @@ over_time <- data_all %>%
   basic_stats(pipeline = T, prettify = T)
 
 over_time_yoy_overall <- over_time %>% 
+  mutate(YEAR = case_when(YEAR == currel_year ~ "CUR.YEAR",
+                          YEAR == currel_year - 1 ~ "PAST.YEAR",
+                          TRUE ~ as.character(YEAR))) %>% 
   dplyr::select(YEAR, `lists (all types)`, `eBirders`, `species`) %>% 
   magrittr::set_colnames(c("YEAR", "Total checklists", "Participants", "Species")) %>% 
   pivot_longer(!matches("YEAR"), names_to = "STAT", values_to = "VALUES") %>% 
   pivot_wider(names_from = YEAR, values_from = VALUES) %>% 
-  mutate(YOY = 100*(`2023`-`2022`)/`2022`)
+  mutate(YOY = 100*(CUR.YEAR-PAST.YEAR)/PAST.YEAR) %>% 
+  rename("{currel_year}" := "CUR.YEAR",
+         "{currel_year - 1}" := "PAST.YEAR")
 
 over_time_yoy_reg <- data_all %>% 
   group_by(COUNTRY, YEAR) %>% 
   basic_stats(pipeline = T, prettify = T) %>% 
   ungroup() %>% 
+  mutate(YEAR = case_when(YEAR == currel_year ~ "CUR.YEAR",
+                          YEAR == currel_year - 1 ~ "PAST.YEAR",
+                          TRUE ~ as.character(YEAR))) %>% 
   dplyr::select(COUNTRY, YEAR, `lists (all types)`, `eBirders`, `species`) %>% 
   magrittr::set_colnames(c("COUNTRY", "YEAR", "Total checklists", "Participants", "Species")) %>%
   group_by(COUNTRY) %>% 
   pivot_longer(c("Total checklists", "Participants", "Species"), 
                names_to = "STAT", values_to = "VALUES") %>% 
   pivot_wider(names_from = YEAR, values_from = VALUES) %>% 
-  mutate(YOY = 100*(`2023`-`2022`)/`2022`)
+  mutate(YOY = 100*(CUR.YEAR-PAST.YEAR)/PAST.YEAR) %>% 
+  rename("{currel_year}" := "CUR.YEAR",
+         "{currel_year - 1}" := "PAST.YEAR")
 
 # common species overall
 overall_com_spec <- data0 %>%

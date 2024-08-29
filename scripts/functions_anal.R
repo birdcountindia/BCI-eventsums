@@ -165,7 +165,8 @@ gen_spec_list_nonAPI <- function(data, regions, dates, repfreq = FALSE) {
     # top per region
     arrange(desc(REP.FREQ))
   
-  
+  if (length(dates) > 1) {
+    
   list_spec <- data1 %>% 
     distinct(REGION, COMMON.NAME, OBSERVATION.DATE) %>% 
     mutate(OBSERVATION.DATE = as_date(OBSERVATION.DATE)) %>% 
@@ -184,7 +185,24 @@ gen_spec_list_nonAPI <- function(data, regions, dates, repfreq = FALSE) {
       left_join(., spec_rf, by = c("COMMON.NAME", "REGION"))
     } else {
       .
-    }}
+    }}    
+  
+  } else if (length(dates) == 1) {
+    
+    list_spec <- data1 %>% 
+      distinct(REGION, COMMON.NAME) %>% 
+      left_join(ebd_tax, by = c("COMMON.NAME" = "ENGLISH.NAME")) %>% 
+      arrange(REGION, SORT) %>% 
+      left_join(get_admin_names(parent_code), by = "REGION") %>% 
+      dplyr::select(REGION, REGION.NAME, COMMON.NAME) %>%  # remove DATE for pivot
+      arrange(REGION) %>% 
+      {if (repfreq == TRUE) {
+        left_join(., spec_rf, by = c("COMMON.NAME", "REGION"))
+      } else {
+        .
+      }}    
+    
+  }
   
   return(list_spec)
   
@@ -211,40 +229,58 @@ gen_part_summ_nonAPI <- function(data, regions, dates) {
     }} %>% 
     filter(REGION %in% regions)
   
-  summary_part <- data1 %>% 
-    group_by(REGION, OBSERVATION.DATE) %>% 
-    basic_stats(pipeline = TRUE, prettify = FALSE) %>% 
-    ungroup() %>% 
-    dplyr::select(REGION, OBSERVATION.DATE, PARTICIPANTS, LISTS.C, SPECIES) %>% 
-    magrittr::set_colnames(c("REGION", "OBSERVATION.DATE", 
-                             "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
-    mutate(OBSERVATION.DATE = as_date(OBSERVATION.DATE)) %>% 
-    group_by(OBSERVATION.DATE) %>% 
-    mutate(DAY.NO = cur_group_id()) %>% 
-    ungroup() %>% 
-    arrange(DAY.NO, desc(OBSERVERS), desc(SPECIES)) %>% 
-    left_join(get_admin_names(parent_code), by = "REGION") %>% 
-    dplyr::select(DAY.NO, REGION, REGION.NAME, OBSERVERS, CHECKLISTS, SPECIES) %>%  # remove DATE for pivot
-    pivot_longer(c(OBSERVERS, CHECKLISTS, SPECIES),
-                 names_to = "TOTAL", values_to = "VALUE") %>% 
-    pivot_wider(names_from = "DAY.NO", names_glue = "DAY{DAY.NO}", values_from = "VALUE") %>% 
-    mutate(across(starts_with("DAY"), ~ replace_na(., replace = 0))) %>% 
-    arrange(REGION)
+  if (length(dates) > 1) {
+    
+    summary_part <- data1 %>% 
+      group_by(REGION, OBSERVATION.DATE) %>% 
+      basic_stats(pipeline = TRUE, prettify = FALSE) %>% 
+      ungroup() %>% 
+      dplyr::select(REGION, OBSERVATION.DATE, PARTICIPANTS, LISTS.C, SPECIES) %>% 
+      magrittr::set_colnames(c("REGION", "OBSERVATION.DATE", 
+                               "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
+      mutate(OBSERVATION.DATE = as_date(OBSERVATION.DATE)) %>% 
+      group_by(OBSERVATION.DATE) %>% 
+      mutate(DAY.NO = cur_group_id()) %>% 
+      ungroup() %>% 
+      arrange(DAY.NO, desc(OBSERVERS), desc(SPECIES)) %>% 
+      left_join(get_admin_names(parent_code), by = "REGION") %>% 
+      dplyr::select(DAY.NO, REGION, REGION.NAME, OBSERVERS, CHECKLISTS, SPECIES) %>%  # remove DATE for pivot
+      pivot_longer(c(OBSERVERS, CHECKLISTS, SPECIES),
+                   names_to = "TOTAL", values_to = "VALUE") %>% 
+      pivot_wider(names_from = "DAY.NO", names_glue = "DAY{DAY.NO}", values_from = "VALUE") %>% 
+      mutate(across(starts_with("DAY"), ~ replace_na(., replace = 0))) %>% 
+      arrange(REGION)
+    
+    # adding all-day totals
+    tot_summary <- data1 %>% 
+      group_by(REGION) %>% 
+      basic_stats(pipeline = TRUE, prettify = FALSE) %>% 
+      ungroup() %>% 
+      dplyr::select(REGION, PARTICIPANTS, LISTS.C, SPECIES) %>% 
+      magrittr::set_colnames(c("REGION", 
+                               "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
+      pivot_longer(c(OBSERVERS, CHECKLISTS, SPECIES),
+                   names_to = "TOTAL", values_to = "ALL.DAYS") 
+    
+    summary_part <- summary_part %>% 
+      left_join(tot_summary, by = c("REGION", "TOTAL"))
+    
+  } else if (length(dates) == 1) {
+    
+    summary_part <- data1 %>% 
+      group_by(REGION) %>% 
+      basic_stats(pipeline = TRUE, prettify = FALSE) %>% 
+      ungroup() %>% 
+      dplyr::select(REGION, PARTICIPANTS, LISTS.C, SPECIES) %>% 
+      magrittr::set_colnames(c("REGION", 
+                               "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
+      arrange(desc(OBSERVERS), desc(SPECIES)) %>% 
+      left_join(get_admin_names(parent_code), by = "REGION") %>% 
+      dplyr::select(REGION, REGION.NAME, OBSERVERS, CHECKLISTS, SPECIES) %>%  # remove DATE for pivot
+      arrange(REGION)
 
-  # adding all-day totals
-  tot_summary <- data1 %>% 
-    group_by(REGION) %>% 
-    basic_stats(pipeline = TRUE, prettify = FALSE) %>% 
-    ungroup() %>% 
-    dplyr::select(REGION, PARTICIPANTS, LISTS.C, SPECIES) %>% 
-    magrittr::set_colnames(c("REGION", 
-                             "OBSERVERS", "CHECKLISTS", "SPECIES")) %>% 
-    pivot_longer(c(OBSERVERS, CHECKLISTS, SPECIES),
-                 names_to = "TOTAL", values_to = "ALL.DAYS") 
-  
-  summary_part <- summary_part %>% 
-    left_join(tot_summary, by = c("REGION", "TOTAL"))
-  
+  }
+
   return(summary_part)
   
 }
