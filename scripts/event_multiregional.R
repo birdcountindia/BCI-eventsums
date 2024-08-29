@@ -25,10 +25,10 @@ source("https://raw.githubusercontent.com/birdcountindia/bci-functions/main/01_f
 
 if (cur_event$SHORT.CODE == "HBC"){
   
-  bhu_zippath <-  glue("../ebird-datasets/EBD/ebd_BT_relJul-2024.zip")
-  nep_zippath <-  glue("../ebird-datasets/EBD/ebd_NP_relJul-2024.zip")
-  bhu_rawfile <-  glue("ebd_BT_relJul-2024.txt")
-  nep_rawfile <-  glue("ebd_NP_relJul-2024.txt")
+  bhu_zippath <-  glue("../ebird-datasets/EBD/ebd_BT_rel{currel_month_lab}-{currel_year}.zip")
+  nep_zippath <-  glue("../ebird-datasets/EBD/ebd_NP_rel{currel_month_lab}-{currel_year}.zip")
+  bhu_rawfile <-  glue("ebd_BT_rel{currel_month_lab}-{currel_year}.txt")
+  nep_rawfile <-  glue("ebd_NP_rel{currel_month_lab}-{currel_year}.txt")
   bhu_rawpath <-  glue("../ebird-datasets/EBD/{bhu_rawfile}")
   nep_rawpath <-  glue("../ebird-datasets/EBD/{nep_rawfile}")
   
